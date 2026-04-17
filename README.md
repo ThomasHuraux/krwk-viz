@@ -17,95 +17,162 @@ No install. No framework. No server. Open `index.html` and play.
 
 ---
 
-## What is it
+KRWK-VIZ is a **browser groovebox** — drums, bass, and harmonic synth playing together, fused with a **generative visual system** that reacts to every beat, chord, and note in real time. Music and image are the same thing — the visualization isn't decorative, it *is* the instrument.
 
-KRWK-VIZ is a **browser groovebox** — drums, bass, and harmonic synth playing together, fused with a **generative visual system** that reacts to every beat, chord, and note in real time. Music and image are the same thing here — the visualization isn't decorative, it *is* the instrument.
-
-Three instruments, three zones, one canvas:
-
-| Zone | Instrument | Function |
-|------|-----------|----------|
-| **BONES** | Drums | Circular 16-step sequencer — 5 concentric rings (kick → open hihat). Playhead is a rotating needle. |
-| **HUMAN** | — | Controls swing, humanization, seed, BPM, FX sends, per-track mixer. |
-| **COLOR** | Bass + Synth | 303 bass ring (30 patterns) · polyphonic pad synth · circle of fifths · arpeggiator. |
+The interface is divided into three zones that map directly to three musical dimensions:
 
 ---
 
-## Sounds
+## BONES — Rhythm
 
-- **Drums** — synthesized from scratch with Web Audio API. Kick: 4-layer (click transient + sawtooth body + sub sine + mid-punch). Snare, clap, closed/open hihat — all programmatic.
-- **Bass** — 303-style MonoSynth (Tone.js). Sawtooth → resonant LP filter → waveshaper distortion → sidechain from kick.
-- **Synth pads** — PolySynth (Tone.js). Voicings spread across 3 octaves with harmonic tension note. Legato mode.
-- **FX** — Convolution reverb + BPM-synced delay with LP feedback loop. Global sidechain compressor.
+The left zone. A circular drum sequencer with 5 concentric rings, one per instrument. The playhead is a rotating needle that sweeps all rings simultaneously. Every hit fires a visual effect at exact audio time.
+
+**Instruments**
+
+Drums are synthesized from scratch with the Web Audio API — no samples.
+
+| Track | Sound design |
+|-------|-------------|
+| Kick | 4 layers: click transient (bandpass noise) + sawtooth body (320→48 Hz) + sub sine (90→30 Hz) + mid-punch sine (120 Hz). Soft-limiter on output. |
+| Snare | Sine body (200 Hz) + highpass noise crack (280 Hz, 140 ms). |
+| Clap | 3 bandpass noise bursts offset by 0 / 8 / 15 ms. |
+| Closed hihat | Highpass noise (7000 Hz, 65 ms). |
+| Open hihat | Highpass noise (5500 Hz, 400 ms). |
+
+**Sequencer controls**
+
+- **Click** a step button — toggle on/off
+- **STEPS** — 8 / 12 / 16 / 32 steps per pattern
+- **PATTERN A/B/C/D** — queue a pattern switch at the next loop boundary
+- **EUCLID panel** — Euclidean rhythm generator (Bjorklund algorithm). Set hits (K) and rotation (ROT) per track, applied immediately.
+
+**Visual — BONES ring**
+
+5 concentric rings pulse and breathe with the music. Hit effects are queued against `AudioContext.currentTime` and fired frame-accurately:
+
+- `KickFlash` — full-screen white impact
+- `SnareLines` — horizontal scan-lines scrolling down
+- `ClapRings` — expanding concentric rings from the clap ring position
+- Circular oscilloscope — waveform mapped to polar coordinates inside the kick ring
+
+---
+
+## HUMAN — Feel
+
+The center column. No sound of its own — it shapes how everything else plays.
+
+| Control | What it does |
+|---------|-------------|
+| **BPM** | 60–200. Hold +/− to accelerate. |
+| **HUMAN** | Probabilistic gate + velocity jitter + timing drift (±18 ms). Kick is sacred — never affected. Hihat gets the most variation. |
+| **SWING** | Delays odd 16th notes. Pairs with HUMAN for full groove feel. |
+| **SEED** | The randomness source. Same seed + same pattern = identical groove every loop. Hit NEW SEED to reshuffle. |
+| **REVERB** | Convolution reverb send. Clap gets a 35 ms pre-delay to separate attack from tail. |
+| **DELAY** | BPM-synced echo — 1/8, 1/4, or 1/2 note. LP filter in the feedback loop so repeats degrade naturally. |
+| **SIDECHAIN** | Kick pumps the reverb/delay return. Controls the pump depth. |
+| **DIST BSS** | Waveshaper saturation on the 303 bass only. |
+| **MASTER** | Global output volume. |
+| **MIX** | Per-track faders (KCK / SNR / CLP / CH / OH / BSS / SYN) + mute buttons. |
+
+**Visual — PulseVisu**
+
+The small canvas in the center column shows a **spirograph constellation** — a set of self-intersection points of an epitrochoid curve. Computed once per seed (never per frame). On every beat the constellation flashes red and contracts back to rest.
+
+---
+
+## COLOR — Harmony
+
+The right zone. Two instruments sharing one circular visual space: the **polyphonic synth pad** and the **303-style bass**, both driven by harmonic controls built around the circle of fifths.
+
+### Synth pad
+
+A PolySynth (Tone.js) with sawtooth oscillators, a resonant LP filter, and legato voice handling. Voicings are spread over 3 octaves with a deterministic harmonic tension note per chord quality.
+
+**Chord selection**
+
+- **COF nodes** (12 outer dots) — click to select root note and preview the chord immediately
+- **Quality pips** (5 center dots) — select chord quality: `maj` / `min` / `7` / `maj7` / `sus2`
+- **Chord polygon** — the current chord's notes are shown as a polygon inside the COF
+
+**Synth timeline (outer ring)**
+
+8 slots arranged as an arc. Each slot holds a chord with a duration (16n / 8n / 4n / 2n — shown as radial thickness).
+
+- **Click** an empty slot — place the current chord as a step
+- **Double-click** a filled slot — clear it
+- **Click** a filled slot — recall its chord as the current pen
+
+**Arpeggiator (middle ring)**
+
+9 presets displayed as sectors. Click a sector to queue it at the next loop boundary.
+
+| Preset | Pattern |
+|--------|---------|
+| OFF | Arp disabled |
+| UP·4 | Ascending 4 notes (1/8) |
+| UP·8 | Ascending 8 notes (1/16) |
+| DN·4 | Descending 4 notes (1/8) |
+| DN·8 | Descending 8 notes (1/16) |
+| UD·8 | Up then down, 8 notes |
+| ALT·8 | Alternating intervals |
+| OCT·4 | Root + octave jump |
+| BIN·8 | Binary rhythmic motif |
+
+Speed (1/16 · 1/8 · 1/4) and gate (25% · 50% · 80% · 120%) are set in the ARP controls panel.
+
+### Bass — 303
+
+A MonoSynth (Tone.js): sawtooth → resonant LP filter → waveshaper distortion → sidechain gain → master. Auto-sidechain from kick. Portamento on slide steps.
+
+**30 patterns** across 5 styles, displayed as a ring in the lower-right:
+
+| Style | Patterns | Character |
+|-------|----------|-----------|
+| HSE | 0–5 | Minimal to full house walking bass |
+| ACD | 6–13 | Classic 303 acid lines with slides and accents |
+| BRG | 14–18 | Transition patterns between house and techno |
+| TCH | 19–24 | Industrial techno, repetitive and driving |
+| RVE | 25–29 | Hard rave, maximum density |
+
+- **Click** a pattern button — queue it at the next bass loop boundary
+- **Double-click** — add/remove from chain (auto-cycles through chained patterns each loop)
+- **Click** bass ring center — prev / next pattern
+- **Double-click** bass ring center — toggle current pattern in chain
+- **CUT / RES / ENV / DEC** — live filter tweaking (cutoff Hz, resonance Q, env mod octaves, decay s)
+
+---
+
+## Transport
+
+| Button / Key | Action |
+|---|---|
+| `▶ PLAY` | Start. Initializes audio context on first click. |
+| `■ STOP` | Stop transport, reset step to 0. |
+| `↺ RESET` | Clear all patterns back to default. |
+| `⊡ CAPTURE` or `SPACE` | Export canvas as PNG — filename encodes BPM, seed, chord, and timestamp. |
+| `FULL` | Toggle fullscreen. |
+| `LGT / DRK` | Toggle light / dark theme. |
 
 ---
 
 ## Visual system
 
-The canvas evolves over time. The longer you play, the more alive it gets.
+The canvas evolves the longer you play. **TemporalMemory** accumulates loop count and energy and drives all visual mutation parameters:
 
-**TemporalMemory** tracks your session arc:
-- loops 1–4 → precise, minimal, pure machine
-- loops 5–16 → rings breathe, trails appear
-- loops 17–32 → organic wobble, grain densifies
-- loops 33+ → maximum expression
+```
+loops  1–4   →  precise, minimal, pure machine
+loops  5–16  →  rings breathe, trails appear
+loops 17–32  →  organic wobble, grain densifies
+loops 33+    →  maximum expression
+```
 
-**Effects fired at audio time** (not animation frame):
-- `KickFlash` — full-screen white impact
-- `SnareLines` — horizontal scan-lines scrolling down
-- `ClapRings` — expanding concentric rings
-- Circular oscilloscope — waveform mapped to polar coordinates
-
-**PulseVisu** — a spirograph constellation (epitrochoid self-intersections) that pulses at the BPM. Computed once per seed, never recalculated per frame.
-
----
-
-## Controls
-
-### Sequencer
-- **Click** a step button to toggle it on/off
-- **STEPS** selector — 8 / 12 / 16 / 32 steps per pattern
-- **PATTERN** A/B/C/D — queue switches at loop boundary
-
-### Synth / Harmony
-- **Click** a COF node — selects root + previews chord
-- **Quality pips** at center — maj / min / 7 / maj7 / sus2
-- **Outer ring slots** — place chords on a timeline (click = place pen, dblclick = clear)
-- **Arp ring** — 9 presets (OFF, UP·4, UP·8, DN·4, DN·8, UD·8, ALT·8, OCT·4, BIN·8)
-
-### Bass
-- **Bass ring** — 30 patterns across 5 styles: House → Acid → Bridge → Techno → Hard/Rave
-- **Single click** bass center — prev/next pattern
-- **Double click** a pattern button — add to chain (auto-advance each loop)
-- **CUT / RES / ENV / DEC** sliders — live 303 filter tweaking
-
-### Human column
-| Control | Effect |
-|---------|--------|
-| HUMAN | Probabilistic gate + velocity jitter + timing drift. Kick is sacred — never affected. |
-| SWING | Pushes odd 16th notes back. Pairs with HUMAN for full groove. |
-| SEED | Deterministic randomness — same seed = same groove. NEW SEED reshuffles. |
-| REVERB | Convolution reverb send (clap gets pre-delay for punch separation). |
-| DELAY | BPM-synced echo (1/8, 1/4, 1/2). LP in feedback loop — repeats degrade naturally. |
-| SIDECHAIN | Kick pumps the reverb/delay return. |
-| DIST BSS | Waveshaper saturation on the 303 bass. |
-
-### Transport
-| Key / Button | Action |
-|---|---|
-| `▶ PLAY` | Starts sequencer + initializes audio on first click |
-| `■ STOP` | Stops transport, resets step |
-| `↺ RESET` | Clears all patterns back to default |
-| `SPACE` | Capture canvas as PNG |
-| `⊡ CAPTURE` | Same — exports `KRWK-VIZ_BPMxxx_SEEDxxxx_Chord_time.png` |
-| `FULL` | Fullscreen |
-| `LGT / DRK` | Light / dark theme toggle |
+Visual events are never tied to animation frames — they are queued against `AudioContext.currentTime` and fired when the clock reaches them, keeping sound and image frame-accurate.
 
 ---
 
 ## Architecture
 
-Vanilla JS, ES modules, zero build step. Tone.js loaded via CDN for synthesis.
+Vanilla JS, ES modules, zero build step. Tone.js via CDN.
 
 ```
 js/
@@ -144,27 +211,23 @@ js/
         └── HiHatGrain.js
 ```
 
-**Key design decisions:**
-
-- Audio scheduling uses `AudioContext.currentTime` with a 100ms lookahead — never `setInterval`
+**Key decisions:**
+- Audio scheduling uses `AudioContext.currentTime` with 100 ms lookahead — never `setInterval`
 - Visual events are queued against audio time and fired frame-accurately via `_pendingEffects`
-- All UI state flows through `EventBus` — no direct module coupling
-- Geometry is computed once and shared — `StepGrid`, `VisuCanvas`, and all overlays stay pixel-perfect in sync
+- All state flows through `EventBus` — no direct module coupling
+- `Geometry.js` is the single source of truth for all layout values — `StepGrid`, `VisuCanvas`, and all overlays stay pixel-perfect in sync
 
 ---
 
 ## Run locally
 
 ```bash
-# No build needed — just serve the directory
 npx serve .
 # or
 python3 -m http.server 8080
 ```
 
-Open `http://localhost:8080`.
-
-Tests (Vitest):
+Tests:
 ```bash
 npm test
 ```
@@ -173,12 +236,10 @@ npm test
 
 ## Aesthetic
 
-Inspired by Bauhaus graphic design and Kraftwerk's visual language.
+Bauhaus / Kraftwerk.
 
-- Background: `#0A0A0A`
-- Elements: `#F0F0F0`
-- Accent: `#E8000D`
-- Typography: Courier New / monospace only
+- Background `#0A0A0A` · Elements `#F0F0F0` · Accent `#E8000D`
+- Monospace only (Courier New)
 - No gradients. No shadows. No rounded corners.
 
 ---
