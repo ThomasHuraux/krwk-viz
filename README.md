@@ -1,6 +1,7 @@
 # KRWK—VIZ
 
-**Browser-based drum sequencer + generative audio visualizer.**  
+**Browser-based groovebox + generative audio visualizer.**  
+Drum sequencer · 303 bass · polyphonic synth · arpeggiator — all wired to a live visual system.  
 No install. No framework. No server. Open `index.html` and play.
 
 ---
@@ -18,15 +19,15 @@ No install. No framework. No server. Open `index.html` and play.
 
 ## What is it
 
-KRWK-VIZ is a **16-step drum sequencer** fused with a **generative visual system** that reacts to every beat, chord, and note in real time. Music and image are the same thing here — the visualization isn't decorative, it *is* the instrument.
+KRWK-VIZ is a **browser groovebox** — drums, bass, and harmonic synth playing together, fused with a **generative visual system** that reacts to every beat, chord, and note in real time. Music and image are the same thing here — the visualization isn't decorative, it *is* the instrument.
 
-Three zones, one canvas:
+Three instruments, three zones, one canvas:
 
-| Zone | Function |
-|------|----------|
-| **BONES** | Circular step sequencer — 5 concentric rings (kick → hihat). Playhead is a rotating needle. |
-| **HUMAN** | Controls swing, humanization, seed, BPM, FX sends, mixer. |
-| **COLOR** | Circle of fifths (COF) + synth chord sequencer + arpeggiator ring. |
+| Zone | Instrument | Function |
+|------|-----------|----------|
+| **BONES** | Drums | Circular 16-step sequencer — 5 concentric rings (kick → open hihat). Playhead is a rotating needle. |
+| **HUMAN** | — | Controls swing, humanization, seed, BPM, FX sends, per-track mixer. |
+| **COLOR** | Bass + Synth | 303 bass ring (30 patterns) · polyphonic pad synth · circle of fifths · arpeggiator. |
 
 ---
 
