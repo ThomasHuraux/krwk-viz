@@ -15,8 +15,6 @@ No install. No framework. No build step. Serve locally and play.
 ╚═╝  ╚═╝╚═╝  ╚═╝ ╚══╝╚══╝ ╚═╝  ╚═╝     ╚═══╝  ╚═╝╚══════╝
 ```
 
-<img width="1381" height="660" alt="Capture d’écran 2026-04-17 à 09 04 07" src="https://github.com/user-attachments/assets/118cd980-eb75-40ab-9c67-6d4f6a102cf2" />
-
 
 ---
 
