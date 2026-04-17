@@ -2,7 +2,7 @@
 
 **Browser-based groovebox + generative audio visualizer.**  
 Drum sequencer · 303 bass · polyphonic synth · arpeggiator — all wired to a live visual system.  
-No install. No framework. No server. Open `index.html` and play.
+No install. No framework. No build step. Serve locally and play.
 
 ---
 
