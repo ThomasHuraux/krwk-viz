@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KRWK—VIZ</title>
+  <!-- DIN 1451 approximation via web font — fallback to Courier New -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&display=swap" rel="stylesheet">
+  <!-- Tone.js — loaded before ES modules so window.Tone is available -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/15.0.4/Tone.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Layer 0 — living canvas background -->
+  <canvas id="visu"></canvas>
+
+  <!-- Layer 1 — UI overlay -->
+  <div id="app">
+
+    <!-- Bandeau BONES / HUMAN / COLOR -->
+    <header id="header">
+      <div class="zone-label" id="label-bones">BONES</div>
+      <div class="zone-label" id="label-human">HUMAN</div>
+      <div class="zone-label" id="label-color">COLOR</div>
+    </header>
+
+    <!-- Three-column workspace -->
+    <div id="workspace">
+
+      <div id="bones">
+        <!-- Step buttons positioned by StepGrid.js in fixed coords -->
+        <div id="sequencer"></div>
+      </div>
+
+      <div id="human">
+        <div id="human-controls"></div>
+      </div>
+
+      <div id="color"></div>
+
+    </div>
+
+    <!-- Bottom control bar -->
+    <div id="bottom-bar">
+      <div id="transport-controls">
+        <button id="btn-play"  class="bar-btn">▶ PLAY</button>
+        <button id="btn-stop"  class="bar-btn">■ STOP</button>
+        <button id="btn-reset" class="bar-btn">↺ RESET</button>
+      </div>
+
+      <div id="pattern-row">
+        <span class="bar-label">PATTERN</span>
+        <div id="pattern-selector"></div>
+      </div>
+
+      <div id="length-row">
+        <span class="bar-label">STEPS</span>
+        <button class="length-btn" data-steps="8">8</button>
+        <button class="length-btn active" data-steps="16">16</button>
+        <button class="length-btn" data-steps="12">12</button>
+        <button class="length-btn" data-steps="32">32</button>
+      </div>
+
+      <div id="bar-right">
+        <button id="btn-theme"      class="bar-btn">LGT</button>
+        <button id="btn-capture"    class="bar-btn">⊡ CAPTURE</button>
+        <button id="btn-fullscreen" class="bar-btn">FULL</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="euc-panel-mount"></div>
+  <div id="arp-controls-mount"></div>
+  <div id="bass-controls-mount"></div>
+  <div id="bass-browser-mount"></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
