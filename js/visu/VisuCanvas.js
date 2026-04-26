@@ -197,16 +197,18 @@ const VisuCanvas = {
   _resize() {
     this.width  = this.canvas.width  = window.innerWidth;
     this.height = this.canvas.height = window.innerHeight;
+    Geometry.update();
     this._initWaterfall();
   },
 
   _initWaterfall() {
+    const bonesW          = Math.floor(this.width * 0.42);
     this._wfCanvas        = document.createElement('canvas');
-    this._wfCanvas.width  = this.width;
+    this._wfCanvas.width  = bonesW;
     this._wfCanvas.height = this.height;
     this._wfCtx           = this._wfCanvas.getContext('2d');
     this._wfCtx.fillStyle = '#0A0A0A';
-    this._wfCtx.fillRect(0, 0, this.width, this.height);
+    this._wfCtx.fillRect(0, 0, bonesW, this.height);
   },
 
   _loop() {
@@ -300,7 +302,8 @@ const VisuCanvas = {
     const fft  = new Float32Array(analyser.frequencyBinCount);
     analyser.getFloatFrequencyData(fft);
     const bins = fft.length;
-    const W    = this.width, H = this.height;
+    const W    = this._wfCanvas.width;
+    const H    = this.height;
     const ctx  = this._wfCtx;
 
     // Scroll 1px left
@@ -315,7 +318,7 @@ const VisuCanvas = {
       const freqFrac = 1 - py / H;
       const binIdx   = Math.floor(Math.pow(freqFrac, 1.8) * (bins - 1));
       const dbVal    = fft[Math.min(binIdx, bins - 1)];
-      const norm     = Math.max(0, Math.min(1, (dbVal + 90) / 75));
+      const norm     = Math.max(0, Math.min(1, (dbVal + 90) / 90));
       const i        = py * 4;
       d[i]     = r * norm * norm;
       d[i + 1] = g * norm * norm;
@@ -324,10 +327,11 @@ const VisuCanvas = {
     }
     ctx.putImageData(col, W - 1, 0);
 
-    // Composite onto main canvas (behind rings)
-    this.ctx.globalAlpha = 0.55;
+    // Composite onto main canvas — clipped to BONES zone only
+    this.ctx.save();
+    this.ctx.globalAlpha = 0.30;
     this.ctx.drawImage(this._wfCanvas, 0, 0);
-    this.ctx.globalAlpha = 1.0;
+    this.ctx.restore();
   },
 
   // Orthogonal grid — full screen, #1A1A1A on #0A0A0A
