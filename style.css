@@ -136,7 +136,8 @@ html, body {
 #hc-pulse {
   display: block;
   width: 100%;
-  aspect-ratio: 1 / 1;   /* carré — forme géométrique symétrique */
+  aspect-ratio: 3 / 2;
+  min-height: 160px;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }
