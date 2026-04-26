@@ -19,7 +19,6 @@ import BassControls   from './ui/BassControls.js';
 import BassPatternBrowser from './ui/BassPatternBrowser.js';
 import EuclideanPanel from './ui/EuclideanPanel.js';
 import VisuCanvas     from './visu/VisuCanvas.js';
-import TerrainVisu    from './visu/TerrainVisu.js';
 
 // App state — single source of truth for transport status
 const AppState = {
@@ -50,7 +49,6 @@ async function boot() {
   // UI
   StepGrid.init(document.getElementById('sequencer'));
   HumanColumn.init(document.getElementById('human-controls'));
-  TerrainVisu.init(document.getElementById('hc-pulse'));
   PatternSelector.init(document.getElementById('pattern-selector'));
   ArpControls.init(document.getElementById('arp-controls-mount'));
   BassControls.init(document.getElementById('bass-controls-mount'));

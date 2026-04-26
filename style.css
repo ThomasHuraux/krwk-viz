@@ -132,16 +132,6 @@ html, body {
 
 .hc-section-human { gap: 6px; }
 
-/* ── PulseVisu — trace EKG oscilloscopique (HUMAN column) ── */
-#hc-pulse {
-  display: block;
-  width: 100%;
-  aspect-ratio: 3 / 2;
-  min-height: 160px;
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
-}
-[data-theme="light"] #hc-pulse { filter: invert(1) hue-rotate(180deg); }
 
 .hc-human-num {
   font-family: var(--font-din);

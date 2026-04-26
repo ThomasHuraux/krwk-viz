@@ -22,10 +22,6 @@ const HumanColumn = {
 
       <div class="hc-divider"></div>
 
-      <canvas id="hc-pulse"></canvas>
-
-      <div class="hc-divider"></div>
-
       <div class="hc-section hc-section-human">
         <div class="hc-label">HUMAN</div>
         <div class="hc-human-num" id="hc-human-num">0</div>

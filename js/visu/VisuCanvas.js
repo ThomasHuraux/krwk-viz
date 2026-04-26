@@ -94,6 +94,9 @@ const VisuCanvas = {
   _wfCanvas: null,
   _wfCtx:    null,
 
+  // Terrain 3D — FFT history buffer
+  _terrainHistory: [],
+
   setPhosphorColor(c) { this._phosphorColor = { ...c }; },
 
   init(canvas) {
@@ -101,6 +104,7 @@ const VisuCanvas = {
     this.ctx    = canvas.getContext('2d', { alpha: false });
     this.ctx.imageSmoothingEnabled = false;
 
+    this._terrainHistory = Array.from({ length: 40 }, () => new Float32Array(80));
     this._resize();
     window.addEventListener('resize', () => {
       Geometry.update();
@@ -118,6 +122,7 @@ const VisuCanvas = {
     EventBus.on('transport:stop', () => {
       this._pendingSteps   = [];
       this._pendingEffects = [];
+      this._terrainHistory = Array.from({ length: 40 }, () => new Float32Array(80));
     });
 
     EventBus.on('human:change', ({ value }) => { this._humanAmount = value; });
@@ -281,6 +286,7 @@ const VisuCanvas = {
     ctx.fillRect(0, 0, this.width, this.height);
 
     this._drawWaterfall();
+    this._drawTerrain();
 
     // Layer 1 — grid redrawn each frame (no trail)
     this._drawGrid();
@@ -332,6 +338,111 @@ const VisuCanvas = {
     this.ctx.globalAlpha = 0.30;
     this.ctx.drawImage(this._wfCanvas, 0, 0);
     this.ctx.restore();
+  },
+
+  _drawTerrain() {
+    const analyser = AudioEngine.getAnalyser();
+    if (!analyser) return;
+
+    const BINS  = 80;
+    const DEPTH = 40;
+
+    // Push new FFT frame into history
+    const raw   = new Float32Array(analyser.frequencyBinCount);
+    analyser.getFloatFrequencyData(raw);
+    const frame = new Float32Array(BINS);
+    for (let b = 0; b < BINS; b++) {
+      const src = Math.floor(b / BINS * raw.length * 0.6);
+      frame[b]  = Math.max(0, (Math.max(-90, raw[src]) + 90) / 90);
+    }
+    this._terrainHistory.unshift(frame);
+    if (this._terrainHistory.length > DEPTH) this._terrainHistory.pop();
+
+    const { ctx } = this;
+
+    // Clip to HUMAN zone (42%–58% of viewport width, below header, above bottom bar)
+    const humanLeft  = this.width  * 0.42;
+    const humanRight = this.width  * 0.58;
+    const humanW     = humanRight - humanLeft;
+    const topY       = 80;
+    const botY       = this.height - 48;
+    const H          = botY - topY;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(humanLeft, topY, humanW, H);
+    ctx.clip();
+
+    // Projection (relative to HUMAN zone)
+    const FLOOR_Y = H * 0.78;
+    const FOV_X   = humanW * 0.85;
+    const FOV_Z   = H      * 0.60;
+    const TILT    = 0.55;
+
+    const project = (b, row, amp) => {
+      const zFrac      = row / (DEPTH - 1);
+      const xFrac      = b   / (BINS  - 1);
+      const perspScale = 0.12 + zFrac * 0.88;
+      return {
+        x:     humanLeft + humanW * 0.5 + (xFrac - 0.5) * FOV_X * perspScale,
+        y:     topY + FLOOR_Y - (1 - zFrac) * FOV_Z * TILT - amp * 160 * perspScale,
+        zFrac,
+      };
+    };
+
+    const { r, g, b: pb } = this._phosphorColor;
+    const pal = (a) => `rgba(${r},${g},${pb},${a.toFixed(3)})`;
+
+    // Painter's algorithm: back to front
+    for (let row = DEPTH - 1; row >= 0; row--) {
+      const hist = this._terrainHistory[row] ?? this._terrainHistory[this._terrainHistory.length - 1];
+      const pts  = [];
+      for (let b = 0; b < BINS; b++) pts.push(project(b, row, hist[b]));
+      const { zFrac } = pts[0];
+      const floorY    = topY + FLOOR_Y;
+
+      // Occlusion fill
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let b = 1; b < BINS; b++) ctx.lineTo(pts[b].x, pts[b].y);
+      ctx.lineTo(pts[BINS - 1].x, floorY + 10);
+      ctx.lineTo(pts[0].x,        floorY + 10);
+      ctx.closePath();
+      ctx.fillStyle = `rgba(10,10,10,${(0.60 + zFrac * 0.38).toFixed(3)})`;
+      ctx.fill();
+
+      // Wireframe stroke
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let b = 1; b < BINS; b++) ctx.lineTo(pts[b].x, pts[b].y);
+
+      if (row === 0) {
+        // Front row — glow pass then sharp pass
+        ctx.strokeStyle = pal(0.15);
+        ctx.lineWidth   = 7;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let b = 1; b < BINS; b++) ctx.lineTo(pts[b].x, pts[b].y);
+        ctx.strokeStyle = pal(0.90);
+        ctx.lineWidth   = 1.5;
+      } else {
+        ctx.strokeStyle = pal(0.04 + zFrac * 0.52);
+        ctx.lineWidth   = zFrac < 0.3 ? 0.4 : zFrac < 0.7 ? 0.7 : 1.2;
+      }
+      ctx.stroke();
+    }
+
+    // Axis labels
+    ctx.font         = '9px "Courier New"';
+    ctx.fillStyle    = pal(0.40);
+    ctx.textBaseline = 'top';
+    ctx.textAlign    = 'left';
+    ctx.fillText('20Hz',   humanLeft + 6,       topY + FLOOR_Y + 4);
+    ctx.textAlign    = 'right';
+    ctx.fillText('20kHz',  humanRight - 6,      topY + FLOOR_Y + 4);
+
+    ctx.restore();
   },
 
   // Orthogonal grid — full screen, #1A1A1A on #0A0A0A
