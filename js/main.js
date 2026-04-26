@@ -19,7 +19,7 @@ import BassControls   from './ui/BassControls.js';
 import BassPatternBrowser from './ui/BassPatternBrowser.js';
 import EuclideanPanel from './ui/EuclideanPanel.js';
 import VisuCanvas     from './visu/VisuCanvas.js';
-import PulseVisu      from './visu/PulseVisu.js';
+import TerrainVisu    from './visu/TerrainVisu.js';
 
 // App state — single source of truth for transport status
 const AppState = {
@@ -50,7 +50,7 @@ async function boot() {
   // UI
   StepGrid.init(document.getElementById('sequencer'));
   HumanColumn.init(document.getElementById('human-controls'));
-  PulseVisu.init(document.getElementById('hc-pulse'));
+  TerrainVisu.init(document.getElementById('hc-pulse'));
   PatternSelector.init(document.getElementById('pattern-selector'));
   ArpControls.init(document.getElementById('arp-controls-mount'));
   BassControls.init(document.getElementById('bass-controls-mount'));
@@ -85,17 +85,23 @@ async function boot() {
     // keep AppState as-is — reset doesn't stop transport
   });
 
-  // Theme toggle (dark ↔ light)
+  // Theme / phosphor palette toggle — 3 states: dark (white) → amber → green → dark
+  const THEME_CYCLE  = ['dark', 'amber', 'green'];
+  const THEME_LABELS = { dark: 'LGT', amber: 'AMB', green: 'GRN' };
   const btnTheme = document.getElementById('btn-theme');
   const applyTheme = t => {
     document.body.dataset.theme = t;
-    btnTheme.textContent = t === 'light' ? 'DRK' : 'LGT';
-    btnTheme.classList.toggle('active', t === 'light');
+    btnTheme.textContent = THEME_LABELS[t] ?? 'LGT';
+    btnTheme.classList.toggle('active', t !== 'dark');
     localStorage.setItem('krwk-theme', t);
+    EventBus.emit('theme:change', { palette: t === 'dark' ? 'white' : t });
   };
-  applyTheme(localStorage.getItem('krwk-theme') ?? 'dark');
+  const savedTheme = localStorage.getItem('krwk-theme') ?? 'dark';
+  applyTheme(THEME_CYCLE.includes(savedTheme) ? savedTheme : 'dark');
   btnTheme.addEventListener('click', () => {
-    applyTheme(document.body.dataset.theme === 'light' ? 'dark' : 'light');
+    const cur  = document.body.dataset.theme;
+    const next = THEME_CYCLE[(THEME_CYCLE.indexOf(cur) + 1) % THEME_CYCLE.length];
+    applyTheme(next);
   });
 
   // Mixer volume routing (before audio init — values are stored by each engine)

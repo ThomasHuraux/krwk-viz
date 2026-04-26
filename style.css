@@ -21,6 +21,11 @@
   /* Updated each rAF by VisuCanvas */
   --energy:    0;
   --intensity: 0;
+
+  /* Phosphor palette — overridden by data-theme="amber/green" */
+  --phosphor-r: 240;
+  --phosphor-g: 240;
+  --phosphor-b: 240;
 }
 
 /* ── Reset ── */
@@ -780,6 +785,19 @@ html, body {
   letter-spacing: 0.08em;
   color: rgba(240,240,240,0.40);
   text-align: center;
+}
+
+/* ── Phosphor palette states ── */
+[data-theme="amber"] {
+  --phosphor-r: 232;
+  --phosphor-g: 148;
+  --phosphor-b: 13;
+}
+
+[data-theme="green"] {
+  --phosphor-r: 0;
+  --phosphor-g: 232;
+  --phosphor-b: 122;
 }
 
 /* ── Light mode ── */

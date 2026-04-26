@@ -16,7 +16,7 @@ const AudioEngine = {
     this.ctx = new AudioContext();
 
     this.analyser         = this.ctx.createAnalyser();
-    this.analyser.fftSize = 256;
+    this.analyser.fftSize = 1024;
 
     this.masterGain            = this.ctx.createGain();
     this.masterGain.gain.value = 0.85;

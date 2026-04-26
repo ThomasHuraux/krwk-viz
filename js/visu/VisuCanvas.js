@@ -87,6 +87,15 @@ const VisuCanvas = {
   _pendingSteps:   [],
   _pendingEffects: [],
 
+  // Phosphor palette (updated by theme:change)
+  _phosphorColor: { r: 240, g: 240, b: 240 },
+
+  // Waterfall spectrogram — offscreen canvas
+  _wfCanvas: null,
+  _wfCtx:    null,
+
+  setPhosphorColor(c) { this._phosphorColor = { ...c }; },
+
   init(canvas) {
     this.canvas = canvas;
     this.ctx    = canvas.getContext('2d', { alpha: false });
@@ -112,6 +121,15 @@ const VisuCanvas = {
     });
 
     EventBus.on('human:change', ({ value }) => { this._humanAmount = value; });
+
+    EventBus.on('theme:change', ({ palette }) => {
+      const PALETTES = {
+        amber: { r: 232, g: 148, b:  13 },
+        green: { r:   0, g: 232, b: 122 },
+        white: { r: 240, g: 240, b: 240 },
+      };
+      if (PALETTES[palette]) this.setPhosphorColor(PALETTES[palette]);
+    });
 
     EventBus.on('chord:change', ({ root, quality }) => {
       this.currentChord = { root, quality };
@@ -179,6 +197,16 @@ const VisuCanvas = {
   _resize() {
     this.width  = this.canvas.width  = window.innerWidth;
     this.height = this.canvas.height = window.innerHeight;
+    this._initWaterfall();
+  },
+
+  _initWaterfall() {
+    this._wfCanvas        = document.createElement('canvas');
+    this._wfCanvas.width  = this.width;
+    this._wfCanvas.height = this.height;
+    this._wfCtx           = this._wfCanvas.getContext('2d');
+    this._wfCtx.fillStyle = '#0A0A0A';
+    this._wfCtx.fillRect(0, 0, this.width, this.height);
   },
 
   _loop() {
@@ -250,6 +278,8 @@ const VisuCanvas = {
     ctx.fillStyle = `rgba(10, 10, 10, ${mem.bgAlpha})`;
     ctx.fillRect(0, 0, this.width, this.height);
 
+    this._drawWaterfall();
+
     // Layer 1 — grid redrawn each frame (no trail)
     this._drawGrid();
     this._drawBonesGhosts();
@@ -261,6 +291,43 @@ const VisuCanvas = {
     this._drawOscilloscope();
     // this._drawHumanParticles(); // disabled — perf
     // this._drawGrain();          // disabled — perf
+  },
+
+  _drawWaterfall() {
+    const analyser = AudioEngine.getAnalyser();
+    if (!analyser || !this._wfCanvas || !this._wfCtx) return;
+
+    const fft  = new Float32Array(analyser.frequencyBinCount);
+    analyser.getFloatFrequencyData(fft);
+    const bins = fft.length;
+    const W    = this.width, H = this.height;
+    const ctx  = this._wfCtx;
+
+    // Scroll 1px left
+    ctx.drawImage(this._wfCanvas, -1, 0);
+
+    // Write new column at right edge
+    const col = ctx.createImageData(1, H);
+    const d   = col.data;
+    const { r, g, b } = this._phosphorColor;
+
+    for (let py = 0; py < H; py++) {
+      const freqFrac = 1 - py / H;
+      const binIdx   = Math.floor(Math.pow(freqFrac, 1.8) * (bins - 1));
+      const dbVal    = fft[Math.min(binIdx, bins - 1)];
+      const norm     = Math.max(0, Math.min(1, (dbVal + 90) / 75));
+      const i        = py * 4;
+      d[i]     = r * norm * norm;
+      d[i + 1] = g * norm * norm;
+      d[i + 2] = b * norm * norm;
+      d[i + 3] = 255;
+    }
+    ctx.putImageData(col, W - 1, 0);
+
+    // Composite onto main canvas (behind rings)
+    this.ctx.globalAlpha = 0.55;
+    this.ctx.drawImage(this._wfCanvas, 0, 0);
+    this.ctx.globalAlpha = 1.0;
   },
 
   // Orthogonal grid — full screen, #1A1A1A on #0A0A0A
