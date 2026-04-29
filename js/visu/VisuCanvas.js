@@ -90,6 +90,9 @@ const VisuCanvas = {
   // Phosphor palette (updated by theme:change)
   _phosphorColor: { r: 240, g: 240, b: 240 },
 
+  // Chord Burn-in — play count per chord key (e.g. "C_maj")
+  _chordPlayCount: {},
+
   // Waterfall spectrogram — offscreen canvas
   _wfCanvas: null,
   _wfCtx:    null,
@@ -125,6 +128,10 @@ const VisuCanvas = {
       this._terrainHistory = Array.from({ length: 40 }, () => new Float32Array(80));
     });
 
+    EventBus.on('pattern:reset', () => {
+      this._chordPlayCount = {};
+    });
+
     EventBus.on('human:change', ({ value }) => { this._humanAmount = value; });
 
     EventBus.on('theme:change', ({ palette }) => {
@@ -148,6 +155,8 @@ const VisuCanvas = {
 
     EventBus.on('chord:trigger', ({ quality }) => {
       this.chordFlash = 1.0;
+      const key = `${this.currentChord.root}_${this.currentChord.quality}`;
+      this._chordPlayCount[key] = (this._chordPlayCount[key] ?? 0) + 1;
     });
 
     // Arp note — velocity impulse toward node (does not break step tracking)
@@ -623,19 +632,24 @@ const VisuCanvas = {
     ctx.strokeStyle = 'rgba(240,240,240,0.08)';
     ctx.lineWidth = 0.5; ctx.stroke();
 
-    // ── Inner COF — chord polygon ──
+    // ── Inner COF — chord polygon (Burn-in: thickens with repeated plays) ──
     const chordCOF  = chordSemis.map(s => this._semiToCOF(s));
     const sortedCOF = [...chordCOF].sort((a, b) => a - b);
     if (sortedCOF.length >= 2) {
+      const chordKey  = `${this.currentChord.root}_${this.currentChord.quality}`;
+      const playCount = this._chordPlayCount[chordKey] ?? 0;
+      const burn      = Math.min(1, playCount / 20); // saturates at 20 plays
+
       ctx.beginPath();
       sortedCOF.forEach((i, k) => {
         const p = nPos(i, cofR);
         k === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y);
       });
       ctx.closePath();
-      ctx.fillStyle   = `rgba(240,240,240,${0.05 + this.chordFlash * 0.06 + mem.energy * 0.03})`;
-      ctx.strokeStyle = `rgba(240,240,240,${0.60 + this.chordFlash * 0.25})`;
-      ctx.lineWidth = 1.5; ctx.fill(); ctx.stroke();
+      ctx.fillStyle   = `rgba(240,240,240,${(0.05 + burn * 0.08 + this.chordFlash * 0.06 + mem.energy * 0.03).toFixed(3)})`;
+      ctx.strokeStyle = `rgba(240,240,240,${(0.60 + burn * 0.30 + this.chordFlash * 0.25).toFixed(3)})`;
+      ctx.lineWidth   = 1.5 + burn * 2.5; // 1.5px fresh → 4.0px at 20 plays
+      ctx.fill(); ctx.stroke();
     }
 
     // ── 12 COF nodes ──
