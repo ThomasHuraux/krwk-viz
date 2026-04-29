@@ -1097,28 +1097,83 @@ const VisuCanvas = {
     const analyser = AudioEngine.getAnalyser();
     if (!analyser) return;
 
-    const buf = new Float32Array(analyser.frequencyBinCount);
+    const buf = new Float32Array(analyser.fftSize);
     analyser.getFloatTimeDomainData(buf);
 
-    const { ctx }                     = this;
-    const { bonesCX: cx, pivotY: cy } = Geometry;
-    const mem   = TemporalMemory;
-    const baseR = Geometry.bonesRadii.kick * 0.52;
-    const amp   = 14 + mem.energy * 22;
+    const { ctx }    = this;
+    const { r, g, b: pb } = this._phosphorColor;
+    const pal = (a) => `rgba(${r},${g},${pb},${a.toFixed(3)})`;
 
+    // Zone: HUMAN column, band below terrain (82%–100% of zone height)
+    const humanLeft  = this.width  * 0.42;
+    const humanRight = this.width  * 0.58;
+    const humanW     = humanRight - humanLeft;
+    const topY       = 80;
+    const botY       = this.height - 48;
+    const zoneH      = botY - topY;
+    const scopeTop   = topY  + zoneH * 0.82;
+    const scopeBot   = botY  - 8;
+    const scopeH     = scopeBot - scopeTop;
+    const scopeMidY  = scopeTop + scopeH * 0.5;
+
+    if (scopeH < 20) return; // not enough space
+
+    ctx.save();
     ctx.beginPath();
-    for (let i = 0; i <= buf.length; i++) {
-      const idx   = i % buf.length;
-      const angle = -Math.PI / 2 + (idx / buf.length) * Math.PI * 2;
-      const r     = baseR + buf[idx] * amp;
-      const x     = cx + r * Math.cos(angle);
-      const y     = cy + r * Math.sin(angle);
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    ctx.rect(humanLeft, scopeTop, humanW, scopeH);
+    ctx.clip();
+
+    // Background grid — 10 cols × 4 rows
+    ctx.strokeStyle = pal(0.06);
+    ctx.lineWidth   = 0.5;
+    ctx.beginPath();
+    for (let c = 0; c <= 10; c++) {
+      const x = humanLeft + (c / 10) * humanW;
+      ctx.moveTo(x, scopeTop); ctx.lineTo(x, scopeBot);
     }
-    ctx.closePath();
-    ctx.strokeStyle = `rgba(240, 240, 240, ${0.22 + mem.energy * 0.2})`;
-    ctx.lineWidth   = 1;
+    for (let row = 0; row <= 4; row++) {
+      const y = scopeTop + (row / 4) * scopeH;
+      ctx.moveTo(humanLeft, y); ctx.lineTo(humanRight, y);
+    }
     ctx.stroke();
+
+    // Trigger — find first rising zero-crossing
+    let trigIdx = 0;
+    for (let i = 1; i < buf.length / 2; i++) {
+      if (buf[i - 1] < 0 && buf[i] >= 0) { trigIdx = i; break; }
+    }
+
+    // Sample window: 2 screen cycles worth of samples
+    const sampleCount = Math.min(Math.floor(buf.length * 0.25), buf.length - trigIdx);
+
+    // Two-pass phosphor stroke: glow + sharp
+    for (let pass = 0; pass < 2; pass++) {
+      ctx.beginPath();
+      for (let i = 0; i < sampleCount; i++) {
+        const x  = humanLeft + (i / (sampleCount - 1)) * humanW;
+        const y  = scopeMidY - buf[trigIdx + i] * (scopeH * 0.42);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      if (pass === 0) {
+        ctx.strokeStyle = pal(0.12);
+        ctx.lineWidth   = 8;
+      } else {
+        ctx.strokeStyle = pal(0.90);
+        ctx.lineWidth   = 1.5;
+      }
+      ctx.stroke();
+    }
+
+    // Labels — TRIG (top-left) and CH1 (bottom-left)
+    ctx.font         = '8px "Courier New"';
+    ctx.fillStyle    = pal(0.40);
+    ctx.textBaseline = 'top';
+    ctx.textAlign    = 'left';
+    ctx.fillText('TRIG', humanLeft + 4, scopeTop + 3);
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('CH1',  humanLeft + 4, scopeBot - 3);
+
+    ctx.restore();
   },
 
   // ── Ghost patterns (BONES) ────────────────────────────────────────────────
