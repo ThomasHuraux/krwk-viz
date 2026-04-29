@@ -90,6 +90,9 @@ const VisuCanvas = {
   // Phosphor palette (updated by theme:change)
   _phosphorColor: { r: 240, g: 240, b: 240 },
 
+  // Chord Burn-in — play count per chord key (e.g. "C_maj")
+  _chordPlayCount: {},
+
   // Waterfall spectrogram — offscreen canvas
   _wfCanvas: null,
   _wfCtx:    null,
@@ -125,6 +128,10 @@ const VisuCanvas = {
       this._terrainHistory = Array.from({ length: 40 }, () => new Float32Array(80));
     });
 
+    EventBus.on('pattern:reset', () => {
+      this._chordPlayCount = {};
+    });
+
     EventBus.on('human:change', ({ value }) => { this._humanAmount = value; });
 
     EventBus.on('theme:change', ({ palette }) => {
@@ -148,6 +155,8 @@ const VisuCanvas = {
 
     EventBus.on('chord:trigger', ({ quality }) => {
       this.chordFlash = 1.0;
+      const key = `${this.currentChord.root}_${this.currentChord.quality}`;
+      this._chordPlayCount[key] = (this._chordPlayCount[key] ?? 0) + 1;
     });
 
     // Arp note — velocity impulse toward node (does not break step tracking)
@@ -294,6 +303,7 @@ const VisuCanvas = {
     this._drawBonesRings();
     this._drawColorRing();
     this._drawBassRing();
+    this._drawResonanceBridge();
     this._drawEffects();
     this._drawStepMarkers();
     this._drawOscilloscope();
@@ -622,19 +632,24 @@ const VisuCanvas = {
     ctx.strokeStyle = 'rgba(240,240,240,0.08)';
     ctx.lineWidth = 0.5; ctx.stroke();
 
-    // ── Inner COF — chord polygon ──
+    // ── Inner COF — chord polygon (Burn-in: thickens with repeated plays) ──
     const chordCOF  = chordSemis.map(s => this._semiToCOF(s));
     const sortedCOF = [...chordCOF].sort((a, b) => a - b);
     if (sortedCOF.length >= 2) {
+      const chordKey  = `${this.currentChord.root}_${this.currentChord.quality}`;
+      const playCount = this._chordPlayCount[chordKey] ?? 0;
+      const burn      = Math.min(1, playCount / 20); // saturates at 20 plays
+
       ctx.beginPath();
       sortedCOF.forEach((i, k) => {
         const p = nPos(i, cofR);
         k === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y);
       });
       ctx.closePath();
-      ctx.fillStyle   = `rgba(240,240,240,${0.05 + this.chordFlash * 0.06 + mem.energy * 0.03})`;
-      ctx.strokeStyle = `rgba(240,240,240,${0.60 + this.chordFlash * 0.25})`;
-      ctx.lineWidth = 1.5; ctx.fill(); ctx.stroke();
+      ctx.fillStyle   = `rgba(240,240,240,${(0.05 + burn * 0.08 + this.chordFlash * 0.06 + mem.energy * 0.03).toFixed(3)})`;
+      ctx.strokeStyle = `rgba(240,240,240,${(0.60 + burn * 0.30 + this.chordFlash * 0.25).toFixed(3)})`;
+      ctx.lineWidth   = 1.5 + burn * 2.5; // 1.5px fresh → 4.0px at 20 plays
+      ctx.fill(); ctx.stroke();
     }
 
     // ── 12 COF nodes ──
@@ -810,6 +825,71 @@ const VisuCanvas = {
         ctx.fill();
       });
     }
+  },
+
+  // ── Resonance Bridge ─────────────────────────────────────────────────────────
+  // Draws a thin line from the active bass step to the matching COF node when
+  // the bass note belongs to the current chord (consonant). Hidden when dissonant.
+
+  _drawResonanceBridge() {
+    const stepData = this._bassStepData;
+    if (!stepData?.a || this._bassStepIndex < 0) return; // no active step
+
+    // Bass pitch class
+    const bassPC = ((stepData.n % 12) + 12) % 12;
+
+    // Current chord semitones (mod 12)
+    const rootSemi   = TN_SEMI[this.currentChord.root] ?? 0;
+    const intervals  = TN_VOI[this.currentChord.quality] ?? [0, 4, 7];
+    const chordPCs   = intervals.map(iv => (rootSemi + iv) % 12);
+
+    // Only draw when bass is consonant with chord
+    if (!chordPCs.includes(bassPC)) return;
+
+    const { ctx } = this;
+    const { bassRingCX, bassRingCY, bassRingR } = Geometry;
+    const { colorCX: cx, colorCY: cy }          = Geometry;
+    const cofR = Geometry.colorRadii?.hihat_open * 0.46;
+    if (!bassRingR || !cofR) return;
+
+    // Bass step position — outer edge at sector midpoint
+    const SECTOR  = Math.PI * 2 / 16;
+    const GAP     = 0.05;
+    const a0      = -Math.PI / 2 + this._bassStepIndex * SECTOR + GAP / 2;
+    const aMid    = a0 + (SECTOR - GAP) / 2;
+    const bx      = bassRingCX + bassRingR * Math.cos(aMid);
+    const by      = bassRingCY + bassRingR * Math.sin(aMid);
+
+    // Corresponding COF node position
+    const cofIdx  = this._semiToCOF(bassPC);   // 0–11 in circle-of-fifths order
+    const cofAngle = arcAngle(cofIdx, 12);
+    const nx      = cx + cofR * Math.cos(cofAngle);
+    const ny      = cy + cofR * Math.sin(cofAngle);
+
+    // Draw: glow pass + sharp line
+    const energy = TemporalMemory.energy;
+    for (let pass = 0; pass < 2; pass++) {
+      ctx.beginPath();
+      ctx.moveTo(bx, by);
+      ctx.lineTo(nx, ny);
+      if (pass === 0) {
+        ctx.strokeStyle = `rgba(240,240,240,${(0.08 + energy * 0.06).toFixed(3)})`;
+        ctx.lineWidth   = 5;
+      } else {
+        ctx.strokeStyle = `rgba(240,240,240,${(0.50 + energy * 0.25).toFixed(3)})`;
+        ctx.lineWidth   = 1;
+      }
+      ctx.stroke();
+    }
+
+    // Endpoint dots
+    const dotAlpha = (0.55 + energy * 0.30).toFixed(3);
+    [{ x: bx, y: by }, { x: nx, y: ny }].forEach(({ x, y }) => {
+      ctx.beginPath();
+      ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(240,240,240,${dotAlpha})`;
+      ctx.fill();
+    });
   },
 
   // Hit-test bass ring center (for pattern navigation)
@@ -1097,28 +1177,83 @@ const VisuCanvas = {
     const analyser = AudioEngine.getAnalyser();
     if (!analyser) return;
 
-    const buf = new Float32Array(analyser.frequencyBinCount);
+    const buf = new Float32Array(analyser.fftSize);
     analyser.getFloatTimeDomainData(buf);
 
-    const { ctx }                     = this;
-    const { bonesCX: cx, pivotY: cy } = Geometry;
-    const mem   = TemporalMemory;
-    const baseR = Geometry.bonesRadii.kick * 0.52;
-    const amp   = 14 + mem.energy * 22;
+    const { ctx }    = this;
+    const { r, g, b: pb } = this._phosphorColor;
+    const pal = (a) => `rgba(${r},${g},${pb},${a.toFixed(3)})`;
 
+    // Zone: HUMAN column, band below terrain (82%–100% of zone height)
+    const humanLeft  = this.width  * 0.42;
+    const humanRight = this.width  * 0.58;
+    const humanW     = humanRight - humanLeft;
+    const topY       = 80;
+    const botY       = this.height - 48;
+    const zoneH      = botY - topY;
+    const scopeTop   = topY  + zoneH * 0.82;
+    const scopeBot   = botY  - 8;
+    const scopeH     = scopeBot - scopeTop;
+    const scopeMidY  = scopeTop + scopeH * 0.5;
+
+    if (scopeH < 20) return; // not enough space
+
+    ctx.save();
     ctx.beginPath();
-    for (let i = 0; i <= buf.length; i++) {
-      const idx   = i % buf.length;
-      const angle = -Math.PI / 2 + (idx / buf.length) * Math.PI * 2;
-      const r     = baseR + buf[idx] * amp;
-      const x     = cx + r * Math.cos(angle);
-      const y     = cy + r * Math.sin(angle);
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    ctx.rect(humanLeft, scopeTop, humanW, scopeH);
+    ctx.clip();
+
+    // Background grid — 10 cols × 4 rows
+    ctx.strokeStyle = pal(0.06);
+    ctx.lineWidth   = 0.5;
+    ctx.beginPath();
+    for (let c = 0; c <= 10; c++) {
+      const x = humanLeft + (c / 10) * humanW;
+      ctx.moveTo(x, scopeTop); ctx.lineTo(x, scopeBot);
     }
-    ctx.closePath();
-    ctx.strokeStyle = `rgba(240, 240, 240, ${0.22 + mem.energy * 0.2})`;
-    ctx.lineWidth   = 1;
+    for (let row = 0; row <= 4; row++) {
+      const y = scopeTop + (row / 4) * scopeH;
+      ctx.moveTo(humanLeft, y); ctx.lineTo(humanRight, y);
+    }
     ctx.stroke();
+
+    // Trigger — find first rising zero-crossing
+    let trigIdx = 0;
+    for (let i = 1; i < buf.length / 2; i++) {
+      if (buf[i - 1] < 0 && buf[i] >= 0) { trigIdx = i; break; }
+    }
+
+    // Sample window: 2 screen cycles worth of samples
+    const sampleCount = Math.min(Math.floor(buf.length * 0.25), buf.length - trigIdx);
+
+    // Two-pass phosphor stroke: glow + sharp
+    for (let pass = 0; pass < 2; pass++) {
+      ctx.beginPath();
+      for (let i = 0; i < sampleCount; i++) {
+        const x  = humanLeft + (i / (sampleCount - 1)) * humanW;
+        const y  = scopeMidY - buf[trigIdx + i] * (scopeH * 0.42);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      if (pass === 0) {
+        ctx.strokeStyle = pal(0.12);
+        ctx.lineWidth   = 8;
+      } else {
+        ctx.strokeStyle = pal(0.90);
+        ctx.lineWidth   = 1.5;
+      }
+      ctx.stroke();
+    }
+
+    // Labels — TRIG (top-left) and CH1 (bottom-left)
+    ctx.font         = '8px "Courier New"';
+    ctx.fillStyle    = pal(0.40);
+    ctx.textBaseline = 'top';
+    ctx.textAlign    = 'left';
+    ctx.fillText('TRIG', humanLeft + 4, scopeTop + 3);
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('CH1',  humanLeft + 4, scopeBot - 3);
+
+    ctx.restore();
   },
 
   // ── Ghost patterns (BONES) ────────────────────────────────────────────────
