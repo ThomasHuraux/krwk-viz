@@ -294,6 +294,7 @@ const VisuCanvas = {
     this._drawBonesRings();
     this._drawColorRing();
     this._drawBassRing();
+    this._drawResonanceBridge();
     this._drawEffects();
     this._drawStepMarkers();
     this._drawOscilloscope();
@@ -810,6 +811,71 @@ const VisuCanvas = {
         ctx.fill();
       });
     }
+  },
+
+  // ── Resonance Bridge ─────────────────────────────────────────────────────────
+  // Draws a thin line from the active bass step to the matching COF node when
+  // the bass note belongs to the current chord (consonant). Hidden when dissonant.
+
+  _drawResonanceBridge() {
+    const stepData = this._bassStepData;
+    if (!stepData?.a || this._bassStepIndex < 0) return; // no active step
+
+    // Bass pitch class
+    const bassPC = ((stepData.n % 12) + 12) % 12;
+
+    // Current chord semitones (mod 12)
+    const rootSemi   = TN_SEMI[this.currentChord.root] ?? 0;
+    const intervals  = TN_VOI[this.currentChord.quality] ?? [0, 4, 7];
+    const chordPCs   = intervals.map(iv => (rootSemi + iv) % 12);
+
+    // Only draw when bass is consonant with chord
+    if (!chordPCs.includes(bassPC)) return;
+
+    const { ctx } = this;
+    const { bassRingCX, bassRingCY, bassRingR } = Geometry;
+    const { colorCX: cx, colorCY: cy }          = Geometry;
+    const cofR = Geometry.colorRadii?.hihat_open * 0.46;
+    if (!bassRingR || !cofR) return;
+
+    // Bass step position — outer edge at sector midpoint
+    const SECTOR  = Math.PI * 2 / 16;
+    const GAP     = 0.05;
+    const a0      = -Math.PI / 2 + this._bassStepIndex * SECTOR + GAP / 2;
+    const aMid    = a0 + (SECTOR - GAP) / 2;
+    const bx      = bassRingCX + bassRingR * Math.cos(aMid);
+    const by      = bassRingCY + bassRingR * Math.sin(aMid);
+
+    // Corresponding COF node position
+    const cofIdx  = this._semiToCOF(bassPC);   // 0–11 in circle-of-fifths order
+    const cofAngle = arcAngle(cofIdx, 12);
+    const nx      = cx + cofR * Math.cos(cofAngle);
+    const ny      = cy + cofR * Math.sin(cofAngle);
+
+    // Draw: glow pass + sharp line
+    const energy = TemporalMemory.energy;
+    for (let pass = 0; pass < 2; pass++) {
+      ctx.beginPath();
+      ctx.moveTo(bx, by);
+      ctx.lineTo(nx, ny);
+      if (pass === 0) {
+        ctx.strokeStyle = `rgba(240,240,240,${(0.08 + energy * 0.06).toFixed(3)})`;
+        ctx.lineWidth   = 5;
+      } else {
+        ctx.strokeStyle = `rgba(240,240,240,${(0.50 + energy * 0.25).toFixed(3)})`;
+        ctx.lineWidth   = 1;
+      }
+      ctx.stroke();
+    }
+
+    // Endpoint dots
+    const dotAlpha = (0.55 + energy * 0.30).toFixed(3);
+    [{ x: bx, y: by }, { x: nx, y: ny }].forEach(({ x, y }) => {
+      ctx.beginPath();
+      ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(240,240,240,${dotAlpha})`;
+      ctx.fill();
+    });
   },
 
   // Hit-test bass ring center (for pattern navigation)
