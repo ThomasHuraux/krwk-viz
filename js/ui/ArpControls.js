@@ -1,12 +1,7 @@
 import EventBus from '../EventBus.js';
-import Geometry  from '../layout/Geometry.js';
 
 const ArpControls = {
-  _container: null,
-
   init(container) {
-    this._container = container;
-
     container.innerHTML = `
       <div id="arp-controls">
         <div class="arp-row">
@@ -17,10 +12,10 @@ const ArpControls = {
         </div>
         <div class="arp-row">
           <span class="arp-label">GATE</span>
-          <button class="arp-btn arp-gate" data-ratio="0.25">25%</button>
-          <button class="arp-btn arp-gate" data-ratio="0.50">50%</button>
-          <button class="arp-btn arp-gate active" data-ratio="0.80">80%</button>
-          <button class="arp-btn arp-gate" data-ratio="1.20">120%</button>
+          <button class="arp-btn arp-gate" data-ratio="0.25">25</button>
+          <button class="arp-btn arp-gate" data-ratio="0.50">50</button>
+          <button class="arp-btn arp-gate active" data-ratio="0.80">80</button>
+          <button class="arp-btn arp-gate" data-ratio="1.20">120</button>
         </div>
       </div>
     `;
@@ -40,22 +35,6 @@ const ArpControls = {
         EventBus.emit('arp:gate', { ratio: parseFloat(btn.dataset.ratio) });
       });
     });
-
-    this._reposition();
-    window.addEventListener('resize', () => { Geometry.update(); this._reposition(); });
-  },
-
-  _reposition() {
-    const el = this._container.querySelector('#arp-controls');
-    if (!el) return;
-    const outerR = Geometry.colorRadii?.hihat_open ?? 0;
-    const cx     = Geometry.colorCX;
-    const cy     = Geometry.colorCY ?? Geometry.pivotY;
-    // Inside the synth wheel, centered, below scale selection
-    el.style.left      = `${cx}px`;
-    el.style.top       = `${cy + outerR * 0.22}px`;
-    el.style.transform = 'translateX(-50%) scale(0.75)';
-    el.style.transformOrigin = 'top center';
   },
 };
 

@@ -1,19 +1,14 @@
 import EventBus from '../EventBus.js';
-import Geometry  from '../layout/Geometry.js';
 
 const BassControls = {
-  _container: null,
-
   init(container) {
-    this._container = container;
-
     container.innerHTML = `
       <div id="bass-controls">
         <div class="bass-row">
           <span class="bass-label">CUT</span>
           <input class="bass-slider" id="bass-cutoff" type="range"
             min="60" max="4000" step="10" value="600">
-          <span class="bass-val" id="bass-cutoff-val">600</span>
+          <span class="bass-val" id="bass-cutoff-val">600 Hz</span>
         </div>
         <div class="bass-row">
           <span class="bass-label">RES</span>
@@ -46,34 +41,10 @@ const BassControls = {
       });
     };
 
-    bind('bass-cutoff', 'bass-cutoff-val', 'cutoff',    v => Math.round(v));
-    bind('bass-res',    'bass-res-val',    'resonance',  v => v.toFixed(1));
-    bind('bass-env',    'bass-env-val',    'envMod',     v => v.toFixed(1));
-    bind('bass-dec',    'bass-dec-val',    'decay',      v => v.toFixed(2));
-
-    this._reposition();
-    window.addEventListener('resize', () => { Geometry.update(); this._reposition(); });
-  },
-
-  _reposition() {
-    const el = this._container.querySelector('#bass-controls');
-    if (!el) return;
-    const browser = document.getElementById('bass-browser');
-    const bRect   = browser ? browser.getBoundingClientRect() : null;
-    if (bRect && bRect.width > 0) {
-      // Stacked just above the preset grid, right-aligned
-      el.style.left      = `${bRect.right}px`;
-      el.style.top       = `${bRect.top - 8}px`;
-      el.style.transform = 'translate(-100%, -100%)';
-    } else {
-      // Fallback: to the right of the bass ring
-      const R  = Geometry.bassRingR;
-      const cx = Geometry.bassRingCX;
-      const cy = Geometry.bassRingCY;
-      el.style.left      = `${cx + R + 16}px`;
-      el.style.top       = `${cy}px`;
-      el.style.transform = 'translate(0, -50%)';
-    }
+    bind('bass-cutoff', 'bass-cutoff-val', 'cutoff',   v => `${Math.round(v)} Hz`);
+    bind('bass-res',    'bass-res-val',    'resonance', v => v.toFixed(1));
+    bind('bass-env',    'bass-env-val',    'envMod',    v => v.toFixed(1));
+    bind('bass-dec',    'bass-dec-val',    'decay',     v => v.toFixed(2));
   },
 };
 
