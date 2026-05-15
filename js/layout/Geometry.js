@@ -1,11 +1,19 @@
 // Geometry — single source of truth for all spatial layout values.
 // Both VisuCanvas and StepGrid import from here to stay pixel-perfect in sync.
 
-const HEADER_H  = 80;   // BONES/HUMAN/COLOR bandeau
-const BOTTOM_H  = 48;   // control bar
-const BONES_COL = 0.42; // fraction of viewport width
+const APP_HEADER_H  = 40;   // #app-header
+const SUBHEADER_H   = 28;   // #subheader
+const PANEL_HEADER_H = 28;  // .panel-header inside each panel
+
+// Total offset above the BONES/COF circle bodies
+const HEADER_H = APP_HEADER_H + SUBHEADER_H + PANEL_HEADER_H; // 96
+
+const BONES_COL = 0.42;
 const HUMAN_COL = 0.16;
 const COLOR_COL = 0.42;
+
+// Bottom strip row height (grid row 4 = 13vh) + its panel headers
+const BOTTOM_STRIP_FRAC = 0.13;
 
 // Ring ratios relative to max radius (outermost = 0.50)
 export const RING_RATIO = {
@@ -21,18 +29,15 @@ const Geometry = {
   width:     0,
   height:    0,
 
-  // Zone centers
-  bonesCX:   0,  // BONES circle center X
-  colorCX:   0,  // SYNTH circle center X (top-right of COLOR zone)
-  colorCY:   0,  // SYNTH circle center Y (independent of BONES/pivotY)
-  pivotX:    0,  // HUMAN pivot X
-  pivotY:    0,  // shared Y for BONES and needle base
+  bonesCX:   0,
+  colorCX:   0,
+  colorCY:   0,
+  pivotX:    0,
+  pivotY:    0,
 
-  // Derived radii (computed from max radius)
   bonesRadii: {},
-  colorRadii: {},  // same proportions, different center — ready for Sprint D
+  colorRadii: {},
 
-  // Bass ring geometry (COLOR column, below main ring)
   bassRingCX: 0,
   bassRingCY: 0,
   bassRingR:  0,
@@ -40,6 +45,9 @@ const Geometry = {
   update() {
     this.width  = window.innerWidth;
     this.height = window.innerHeight;
+
+    // Bottom strip takes 13vh + panel header each side
+    const BOTTOM_H = Math.round(this.height * BOTTOM_STRIP_FRAC) + PANEL_HEADER_H;
 
     const availH     = this.height - HEADER_H - BOTTOM_H;
     const colorLeft  = this.width * (BONES_COL + HUMAN_COL);
@@ -49,35 +57,13 @@ const Geometry = {
     this.pivotX  = this.width * (BONES_COL + HUMAN_COL / 2);
     this.pivotY  = HEADER_H + availH / 2;
 
-    // ── BONES ──────────────────────────────────────────────────────────────
+    // ── BONES ────────────────────────────────────────────────────────────────
     const bonesMaxR  = Math.min(this.width * BONES_COL / 2 - 24, availH / 2 - 24);
     const bonesScale = bonesMaxR / RING_RATIO.hihat_open;
     TRACK_ORDER.forEach(t => { this.bonesRadii[t] = bonesScale * RING_RATIO[t]; });
 
     // ── LEMNISCATE DIAGONAL ───────────────────────────────────────────────────
-    // Synth : coin haut-droit   colorCX = width − synthR − MR
-    //                           colorCY = HEADER_H + synthR + MT
-    // Basse : coin bas-gauche   bassRingCX = colorLeft + bassR + ML
-    //                           bassRingCY = height − BOTTOM_H − bassR − MB
-    //
-    // The synth 300° arc opens toward the bass (direction computed dynamically).
-    // Tangency constraint: D(centers) = synthR + bassR + GAP
-    //   Dx = 2.5b + (ML+MR) − colorWidth
-    //   Dy = availH − 2.5b − (MB+MT)
-    //   D  = 2.5b + GAP     with synthR = 1.5·b
-    //
-    // Analytical solution (x = 2.5·b):
-    //   x = (P+Q+G) − sqrt(2·(G²+PQ+G·(P+Q)))
-    //   P = colorWidth−(ML+MR), Q = availH−(MB+MT), G = GAP
-    //
-    // F = fraction of (synthR+bassR) used as center-to-center distance.
-    // F < 1 → overlap: the arc tip penetrates the bass circle.
-    // F = 0.86 → overlap ≈ 14% of (synthR+bassR) ≈ 60 px at 1440×900.
-    //
-    // Quadratique (x = 2.5·bassR) :
-    //   (F·x)² = (x−P)² + (Q−x)²   P = colorWidth−margins, Q = availH−margins
-    //   (2−F²)·x² − 2(P+Q)·x + (P²+Q²) = 0
-    //
+    // F = 0.86 → overlap ≈ 14% of (synthR+bassR)
     const ML = 8, MR = 8, MT = 8, MB = 8;
     const RATIO = 1.5;
     const F = 0.86;
