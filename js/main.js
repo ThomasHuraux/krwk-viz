@@ -23,6 +23,7 @@ import EuclideanPanel    from './ui/EuclideanPanel.js';
 import VisuCanvas        from './visu/VisuCanvas.js';
 import ChordWheel        from './ui/ChordWheel.js';
 import RackVisu          from './visu/RackVisu.js';
+import MidiInput         from './midi/MidiInput.js';
 
 const AppState = {
   state: 'idle',
@@ -170,6 +171,23 @@ async function boot() {
 
     setTimeout(() => AppState.set(Transport.isPlaying ? 'playing' : 'stopped'), 150);
   }
+
+  // MIDI input
+  const btnMidi = document.getElementById('btn-midi');
+  MidiInput.init().then(ok => {
+    if (!ok) { if (btnMidi) btnMidi.style.display = 'none'; return; }
+    const updateMidiBtn = () => {
+      if (!btnMidi) return;
+      const mode = MidiInput.getMode();
+      btnMidi.textContent = mode === 'chord' ? 'MIDI:CHD' : 'MIDI:NOT';
+      btnMidi.classList.add('active');
+    };
+    updateMidiBtn();
+    if (btnMidi) btnMidi.addEventListener('click', () => {
+      MidiInput.setMode(MidiInput.getMode() === 'chord' ? 'notes' : 'chord');
+      updateMidiBtn();
+    });
+  });
 
   // Mode switching — COMPOSE ↔ VIZU
   function setMode(mode) {
