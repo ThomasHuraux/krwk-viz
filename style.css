@@ -191,7 +191,7 @@ body[data-app-state="playing"] #live-indicator { color: var(--accent); }
     "bones mix    bass"
     "euclid arp   transport";
   gap: 1px;
-  background: var(--inactive);
+  background: transparent;
   overflow: hidden;
   min-height: 0;
 }
