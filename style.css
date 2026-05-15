@@ -1211,3 +1211,54 @@ body[data-app-state="playing"] #panel-transport .panel-header {
 
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { display: none; }
+
+/* ══════════════════════════════════════════════════════════
+   VIZU MODE
+   ══════════════════════════════════════════════════════════ */
+#vizu-rack { display: none; }
+
+body[data-mode="vizu"] #app        { display: none; }
+body[data-mode="vizu"] #chord-wheel { display: none; }
+body[data-mode="vizu"] #vizu-rack {
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  background: var(--bg);
+}
+
+#rack-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 32px;
+  padding: 0 12px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--grid);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg);
+  flex-shrink: 0;
+}
+.rack-unit, .rack-sep { opacity: 0.40; }
+.rack-readout         { opacity: 0.60; }
+#st-pulse             { color: var(--accent); opacity: 0.20; transition: opacity 0.2s; }
+#btn-compose          { margin-left: auto; }
+
+#rack-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 1px;
+  background: var(--grid);
+  overflow: hidden;
+  min-height: 0;
+}
+#rack-grid canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--bg);
+}

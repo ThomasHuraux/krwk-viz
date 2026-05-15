@@ -21,6 +21,9 @@ import BassControls      from './ui/BassControls.js';
 import BassPatternBrowser from './ui/BassPatternBrowser.js';
 import EuclideanPanel    from './ui/EuclideanPanel.js';
 import VisuCanvas        from './visu/VisuCanvas.js';
+import ChordWheel        from './ui/ChordWheel.js';
+import RackVisu          from './visu/RackVisu.js';
+import MidiInput         from './midi/MidiInput.js';
 
 const AppState = {
   state: 'idle',
@@ -43,6 +46,7 @@ async function boot() {
   BassPattern.listen();
 
   VisuCanvas.init(document.getElementById('visu'));
+  ChordWheel.init(document.getElementById('chord-wheel'));
 
   // UI panels — each mounted in its panel-body
   StepGrid.init(document.getElementById('sequencer'));
@@ -167,6 +171,42 @@ async function boot() {
 
     setTimeout(() => AppState.set(Transport.isPlaying ? 'playing' : 'stopped'), 150);
   }
+
+  // MIDI input
+  const btnMidi = document.getElementById('btn-midi');
+  MidiInput.init().then(ok => {
+    if (!ok) { if (btnMidi) btnMidi.style.display = 'none'; return; }
+    const updateMidiBtn = () => {
+      if (!btnMidi) return;
+      const mode = MidiInput.getMode();
+      btnMidi.textContent = mode === 'chord' ? 'MIDI:CHD' : 'MIDI:NOT';
+      btnMidi.classList.add('active');
+    };
+    updateMidiBtn();
+    if (btnMidi) btnMidi.addEventListener('click', () => {
+      MidiInput.setMode(MidiInput.getMode() === 'chord' ? 'notes' : 'chord');
+      updateMidiBtn();
+    });
+  });
+
+  // Mode switching — COMPOSE ↔ VIZU
+  function setMode(mode) {
+    document.body.dataset.mode = mode;
+    const brandMode = document.getElementById('brand-mode');
+    if (brandMode) brandMode.textContent = mode.toUpperCase();
+    if (mode === 'vizu') RackVisu.start();
+    else RackVisu.stop();
+  }
+
+  document.getElementById('btn-vizu').addEventListener('click',       () => setMode('vizu'));
+  document.getElementById('btn-vizu-inner').addEventListener('click', () => setMode('vizu'));
+  document.getElementById('btn-compose').addEventListener('click',    () => setMode('compose'));
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Tab') {
+      e.preventDefault();
+      setMode(document.body.dataset.mode === 'vizu' ? 'compose' : 'vizu');
+    }
+  });
 
   EventBus.on('seed:change', () => {
     const canvas = document.getElementById('visu');
