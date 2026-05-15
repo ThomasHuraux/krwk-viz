@@ -14,6 +14,9 @@
   <!-- Layer 0 — living canvas background -->
   <canvas id="visu"></canvas>
 
+  <!-- Layer 1b — chord quality overlay -->
+  <div id="chord-wheel"></div>
+
   <!-- Layer 1 — UI overlay -->
   <div id="app">
 
@@ -200,6 +203,28 @@
     </div><!-- /workspace -->
 
   </div><!-- /app -->
+
+  <!-- Layer 2 — VIZU rack (masqué jusqu'à data-mode="vizu") -->
+  <div id="vizu-rack">
+    <div id="rack-header">
+      <span id="rack-bpm-label">120</span><span class="rack-unit"> BPM</span>
+      <span id="st-pulse" class="rack-pulse">●</span>
+      <span class="rack-sep">BAR </span><span id="rack-bar">1</span>
+      <span class="rack-sep"> LOOP </span><span id="rack-loop">0</span>
+      <span class="rack-readout"><span id="rd-peak">−90</span> dBFS PEAK</span>
+      <span class="rack-readout"><span id="rd-rms">−90</span> dBFS RMS</span>
+      <span class="rack-readout">Φ <span id="rd-corr">+0.00</span></span>
+      <button id="btn-compose" class="subhdr-btn">← COMPOSE</button>
+    </div>
+    <div id="rack-grid">
+      <canvas id="cv-fft"></canvas>
+      <canvas id="cv-terrain"></canvas>
+      <canvas id="cv-vu"></canvas>
+      <canvas id="cv-spectro"></canvas>
+      <canvas id="cv-scope"></canvas>
+      <canvas id="cv-phase"></canvas>
+    </div>
+  </div>
 
   <script type="module" src="js/main.js"></script>
 </body>
