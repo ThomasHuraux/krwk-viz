@@ -10,7 +10,7 @@ import Humanizer      from './sequencer/Humanizer.js';
 import ArpSeq         from './sequencer/ArpSeq.js';
 import SynthPattern   from './sequencer/SynthPattern.js';
 import BassPattern    from './sequencer/BassPattern.js';
-import ComposeView    from './ui/ComposeView.js?v=8';
+import ComposeView    from './ui/ComposeView.js';
 import RackVisu       from './visu/RackVisu.js';
 import MidiInput      from './midi/MidiInput.js';
 
