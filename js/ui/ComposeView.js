@@ -325,7 +325,7 @@ function buildTransport() {
   const playing = Transport.isPlaying;
   return `<div class="transport-body">
     <div class="transport-main">
-      <button class="btn-big primary" id="btn-play">▶ ${playing ? 'PLAYING' : 'PAUSED'}</button>
+      <button class="btn-big primary" id="btn-play">▶ ${playing ? 'PLAYING' : 'PLAY'}</button>
       <button class="btn-big compact" id="btn-stop">■ STOP</button>
       <button class="btn-big compact" id="btn-reset">↺ RESET</button>
     </div>
@@ -560,7 +560,7 @@ function bindEventBus() {
   });
   EventBus.on('transport:stop', () => {
     const btn = document.getElementById('btn-play');
-    if (btn) btn.textContent = '▶ PAUSED';
+    if (btn) btn.textContent = '▶ PLAY';
   });
 
   // Envelope tracking for VU bars
