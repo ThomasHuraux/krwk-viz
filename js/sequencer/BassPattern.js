@@ -93,7 +93,8 @@ const STYLE_COLOR = {
   hard:   'rgba(232,  0, 13,',  // red
 };
 
-const BassPattern = {
+// Singleton across Vite HMR — main.js + ComposeView + BassPatternBrowser must share one object.
+const _BassPattern = {
   activePattern:   0,
   _pendingPattern: -1,
   _bassStep:       0,
@@ -172,5 +173,9 @@ const BassPattern = {
     EventBus.emit('bass:chain', { chain: [...this._chain] });
   },
 };
+
+const BassPattern = (typeof window !== 'undefined')
+  ? (window.__BassPattern ?? (window.__BassPattern = _BassPattern))
+  : _BassPattern;
 
 export default BassPattern;

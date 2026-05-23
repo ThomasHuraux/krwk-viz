@@ -5,7 +5,9 @@ import Humanizer    from './Humanizer.js';
 
 const TRACKS = ['kick', 'snare', 'clap', 'hihat', 'hihat_open'];
 
-const Transport = {
+// Singleton across Vite HMR re-evaluations — ComposeView reads isPlaying/currentStep
+// directly, so all importers must share one object.
+const _Transport = {
   isPlaying:    false,
   currentStep:  0,
   nextStepTime: 0,
@@ -81,5 +83,9 @@ const Transport = {
     EventBus.emit('transport:tick', { step, time, steps });
   }
 };
+
+const Transport = (typeof window !== 'undefined')
+  ? (window.__Transport ?? (window.__Transport = _Transport))
+  : _Transport;
 
 export default Transport;

@@ -29,7 +29,8 @@ function mulberry32(seed) {
   };
 }
 
-const Humanizer = {
+// Singleton across Vite HMR — Transport reads swingAmount/shouldPlay; init() called once in main.js.
+const _Humanizer = {
   humanAmount: 0,
   swingAmount: 0,
   _seed:       1234,
@@ -76,5 +77,9 @@ const Humanizer = {
     });
   }
 };
+
+const Humanizer = (typeof window !== 'undefined')
+  ? (window.__Humanizer ?? (window.__Humanizer = _Humanizer))
+  : _Humanizer;
 
 export default Humanizer;

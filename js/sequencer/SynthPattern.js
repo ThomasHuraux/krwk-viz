@@ -7,7 +7,8 @@ export const SLOT_COUNT     = 8;
 // Each slot is always present. root:null = silence (empty).
 function emptySlot() { return { root: null, quality: 'maj', duration: '8n' }; }
 
-const SynthPattern = {
+// Singleton across Vite HMR — main.js + ComposeView + SynthEngine must share one object.
+const _SynthPattern = {
   slots:            Array.from({ length: SLOT_COUNT }, emptySlot),
   _subPos:          0,
   currentSlotIndex: -1,
@@ -77,5 +78,9 @@ const SynthPattern = {
     EventBus.on('transport:stop',  ()         => { this._subPos = 0; this.currentSlotIndex = -1; });
   },
 };
+
+const SynthPattern = (typeof window !== 'undefined')
+  ? (window.__SynthPattern ?? (window.__SynthPattern = _SynthPattern))
+  : _SynthPattern;
 
 export default SynthPattern;

@@ -5,7 +5,8 @@ import FXBus         from './FXBus.js';
 // 303-style MonoSynth: sawtooth + resonant LP filter + envelope follower
 // Auto-sidechain with the kick
 
-const BassEngine = {
+// Singleton across Vite HMR — init() and listen() both called from main.js.
+const _BassEngine = {
   synth:      null,
   ctx:        null,
   _gainOut:   null,
@@ -203,5 +204,9 @@ const BassEngine = {
     }
   },
 };
+
+const BassEngine = (typeof window !== 'undefined')
+  ? (window.__BassEngine ?? (window.__BassEngine = _BassEngine))
+  : _BassEngine;
 
 export default BassEngine;

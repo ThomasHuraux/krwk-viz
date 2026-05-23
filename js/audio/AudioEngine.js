@@ -6,7 +6,10 @@ import PatternStore from '../sequencer/PatternStore.js';
 // Tone.js is imported via importmap — available globally after index.html setup.
 // We share our AudioContext with Tone so both can coexist on the same audio graph.
 
-const AudioEngine = {
+// Singleton guaranteed across Vite HMR re-evaluations (same fix as EventBus).
+// All modules that import AudioEngine share one object, so init() sets ctx/analyser
+// once and every subsequent getAnalyser() / ctx read sees the live values.
+const _AudioEngine = {
   ctx:        null,
   analyser:   null,
   masterGain: null,
@@ -66,5 +69,9 @@ const AudioEngine = {
     );
   }
 };
+
+const AudioEngine = (typeof window !== 'undefined')
+  ? (window.__AudioEngine ?? (window.__AudioEngine = _AudioEngine))
+  : _AudioEngine;
 
 export default AudioEngine;

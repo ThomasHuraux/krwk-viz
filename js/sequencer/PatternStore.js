@@ -13,7 +13,8 @@ const defaultTracks = () => ({
   hihat_open: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
 });
 
-const PatternStore = {
+// Singleton across Vite HMR — 16+ files import PatternStore; all must share one instance.
+const _PatternStore = {
   _bpm:           128,
   activePattern:  'A',
   nextPattern:    null,   // queued — applies at next cycle start (step 0)
@@ -109,5 +110,9 @@ const PatternStore = {
     EventBus.emit('preset:load', { id: preset.id });
   }
 };
+
+const PatternStore = (typeof window !== 'undefined')
+  ? (window.__PatternStore ?? (window.__PatternStore = _PatternStore))
+  : _PatternStore;
 
 export default PatternStore;

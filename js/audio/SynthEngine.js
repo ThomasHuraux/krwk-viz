@@ -59,7 +59,9 @@ function buildPadNotes(root, quality) {
   return [...new Set(notes)];
 }
 
-const SynthEngine = {
+// Singleton across Vite HMR — init() called from main.js, listen() called from main.js,
+// MidiInput.js also imports it; all must share one instance.
+const _SynthEngine = {
   synth:      null,
   ctx:        null,
   root:       'C',
@@ -225,5 +227,9 @@ const SynthEngine = {
     this._prevNotes = notes;
   },
 };
+
+const SynthEngine = (typeof window !== 'undefined')
+  ? (window.__SynthEngine ?? (window.__SynthEngine = _SynthEngine))
+  : _SynthEngine;
 
 export default SynthEngine;

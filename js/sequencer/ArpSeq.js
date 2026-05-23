@@ -35,7 +35,8 @@ function buildPool(root, quality) {
   return pool;
 }
 
-const ArpSeq = {
+// Singleton across Vite HMR — main.js listen() + ComposeView state reads must share one object.
+const _ArpSeq = {
   activePreset:   0,    // index in ARP_PRESETS (0 = OFF)
   pendingPreset:  -1,   // -1 = nothing queued
   stepIndex:      0,    // position in the active pattern
@@ -97,5 +98,9 @@ const ArpSeq = {
     this.stepIndex = (this.stepIndex + 1) % preset.steps.length;
   },
 };
+
+const ArpSeq = (typeof window !== 'undefined')
+  ? (window.__ArpSeq ?? (window.__ArpSeq = _ArpSeq))
+  : _ArpSeq;
 
 export default ArpSeq;

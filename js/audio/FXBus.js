@@ -5,7 +5,9 @@ import EventBus from '../EventBus.js';
 const REVERB_SEND = { kick: 0.0, snare: 0.28, clap: 0.60, hihat: 0.12, hihat_open: 0.42 };
 const DELAY_SEND  = { kick: 0.0, snare: 0.15, clap: 0.45, hihat: 0.55, hihat_open: 0.40 };
 
-const FXBus = {
+// Singleton across Vite HMR — AudioEngine.init() calls FXBus.init(), main.js calls FXBus.listen();
+// both must operate on the same object.
+const _FXBus = {
   ctx:          null,
   reverbSend:   null,
   delaySend:    null,
@@ -150,5 +152,9 @@ const FXBus = {
     return buffer;
   }
 };
+
+const FXBus = (typeof window !== 'undefined')
+  ? (window.__FXBus ?? (window.__FXBus = _FXBus))
+  : _FXBus;
 
 export default FXBus;
