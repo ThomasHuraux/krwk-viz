@@ -246,93 +246,47 @@ function drawTerrain() {
 // ══════════════════════════════════════════════════════════════════
 // 03 — STATUS (BPM + per-channel VU)
 // ══════════════════════════════════════════════════════════════════
-let _lastBeat = 0;
+let _lastBeat  = 0;
+let _chord     = { root: 'C', quality: 'maj' };
+let _barStr    = '1.1';
 
-// Pulse on every quarter-note (step % 4 === 0)
-EventBus.on('transport:tick', ({ step }) => {
+EventBus.on('transport:tick', ({ step, steps }) => {
   if (step % 4 === 0) _lastBeat = performance.now();
+  const stepsPerBeat = Math.max(1, steps / 4);
+  const beat = Math.floor(step / stepsPerBeat) + 1;
+  _barStr = beat + '/4';
 });
 
+EventBus.on('chord:change', ({ root, quality }) => {
+  _chord = { root, quality };
+  const el = document.getElementById('st-chord');
+  if (el) el.textContent = root + ' ' + quality;
+});
+
+const _VU_BANDS = [[0,4],[4,12],[12,22],[22,60],[60,100],[2,8],[20,80]];
+
 function drawStatus() {
-  const bpm = PatternStore.getBPM();
-
   const stBpm = document.getElementById('st-bpm');
-  if (stBpm) stBpm.textContent = bpm;
+  if (stBpm) stBpm.textContent = PatternStore.getBPM();
 
-  const rackBpmLabel = document.getElementById('rack-bpm-label');
-  if (rackBpmLabel) rackBpmLabel.textContent = bpm;
+  const stBar = document.getElementById('st-bar');
+  if (stBar) stBar.textContent = _barStr;
 
-  // Beat pulse — lights up on beat, fades in 200 ms
   const pulse = document.getElementById('st-pulse');
   if (pulse) {
     const age = performance.now() - _lastBeat;
-    pulse.style.opacity = age < 200 ? String(1 - age / 200) : '0.12';
+    pulse.style.opacity = age < 200 ? String((1 - age / 200).toFixed(2)) : '0.12';
   }
 
-  // VU bars — canvas-drawn to avoid % height issues in flex/grid
-  const vuCanvas = document.getElementById('cv-vu');
-  if (vuCanvas) { _drawVuCanvas(vuCanvas); return; }
-
-  // Fallback: DOM bars (require explicit container height via CSS)
-  const vuBars = document.querySelectorAll('#st-vu .vizu-vu-bar');
-  if (vuBars.length === 7) {
-    const bands = [
-      [0, 4],    // kick
-      [4, 12],   // snare
-      [12, 22],  // clap
-      [22, 60],  // hi-hat
-      [60, 100], // open hi-hat
-      [2, 8],    // bass
-      [20, 80],  // synth
-    ];
-    bands.forEach(([lo, hi], i) => {
-      let sum = 0;
-      for (let b = lo; b < hi && b < _fftBuf.length; b++) {
-        sum += Math.max(0, (_fftBuf[b] + 90) / 90);
-      }
-      const pct = Math.min(100, (sum / (hi - lo)) * 100);
-      vuBars[i].style.height = pct + '%';
-    });
-  }
-}
-
-function _drawVuCanvas(canvas) {
-  const fit = fitCanvas(canvas); if (!fit) return;
-  const { ctx, W, H } = fit;
-  ctx.clearRect(0, 0, W, H);
-
-  const TRACKS = 7;
-  const gap    = 3;
-  const bW     = (W - gap * (TRACKS + 1)) / TRACKS;
-  const bands  = [[0,4],[4,12],[12,22],[22,60],[60,100],[2,8],[20,80]];
-  const labels = ['KCK','SNR','CLP','CH','OH','BSS','SYN'];
-
-  const labH = 14;
-  const barH = H - labH;
-
-  bands.forEach(([lo, hi], i) => {
+  // VU bars — DOM height from FFT bands
+  _VU_BANDS.forEach(([lo, hi], i) => {
     let sum = 0;
     for (let b = lo; b < hi && b < _fftBuf.length; b++) {
       sum += Math.max(0, (_fftBuf[b] + 90) / 90);
     }
-    const norm = Math.min(1, (sum / (hi - lo)));
-    const x    = gap + i * (bW + gap);
-    const h    = norm * barH;
-
-    // Bar — gradient: accent at bottom, white at top
-    const grad = ctx.createLinearGradient(0, barH, 0, 0);
-    grad.addColorStop(0,   'rgba(232,0,13,0.85)');
-    grad.addColorStop(0.6, 'rgba(232,0,13,0.85)');
-    grad.addColorStop(0.8, 'rgba(232,148,13,0.85)');
-    grad.addColorStop(1,   'rgba(240,240,240,0.85)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(x, barH - h, bW, h);
-
-    // Track label
-    ctx.fillStyle  = 'rgba(240,240,240,0.40)';
-    ctx.font       = '7px "Courier New",monospace';
-    ctx.textAlign  = 'center';
-    ctx.fillText(labels[i], x + bW / 2, H - 2);
+    const norm = Math.min(1, sum / (hi - lo));
+    const bar = document.querySelector(`.status-ch:nth-child(${i + 1}) .bar`);
+    if (bar) bar.style.height = Math.round(norm * 100) + '%';
   });
 }
 
@@ -545,27 +499,80 @@ function drawPhase() {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// Status bar readouts
+// Main loop
 // ══════════════════════════════════════════════════════════════════
-function updateStatusBars() {
-  const loopEl = document.getElementById('rack-loop');
-  const barEl  = document.getElementById('rack-bar');
-  // These are driven by Transport events — just keep values stable
-  if (loopEl && !loopEl._rackSet) { loopEl._rackSet = true; }
-  if (barEl  && !barEl._rackSet)  { barEl._rackSet  = true; }
+// ══════════════════════════════════════════════════════════════════
+// HTML builder helpers
+// ══════════════════════════════════════════════════════════════════
+function _panel({ num, name, readouts = [], cornerBL, cornerBR, body, klass }) {
+  const ro = readouts.map(r =>
+    `<span>${r.label}${r.value !== undefined
+      ? ` <span class="v"${r.id ? ` data-readout="${r.id}"` : ''}>${r.value}</span>`
+      : ''}</span>`
+  ).join('');
+  return `<section class="panel ${klass || ''}">
+    <div class="panel-head"><span class="num">${num}</span><span>${name}</span></div>
+    ${ro ? `<div class="panel-readout">${ro}</div>` : ''}
+    ${body}
+    ${cornerBL ? `<div class="panel-corner bl">${cornerBL}</div>` : ''}
+    ${cornerBR ? `<div class="panel-corner br">${cornerBR}</div>` : ''}
+  </section>`;
 }
 
-EventBus.on('transport:bar',  ({ bar  }) => {
-  const el = document.getElementById('rack-bar');
-  if (el) el.textContent = bar;
-});
-EventBus.on('transport:loop', ({ loop }) => {
-  const el = document.getElementById('rack-loop');
-  if (el) el.textContent = loop;
-});
+function _statusHTML() {
+  const ch = ['KCK','SNR','CLP','CH','OH','BSS','SYN'];
+  const bars = ch.map((l, i) => `
+    <div class="status-ch">
+      <div class="meter"><div class="bar" data-vu="${i}"></div></div>
+      <div class="lbl">${l}</div>
+    </div>`).join('');
+  return `<div class="status-body">
+    <div class="status-top">
+      <div class="status-bpm" id="st-bpm">128</div>
+      <div class="status-bpm-side">
+        <div>BPM</div>
+        <div class="v" id="st-bar">1.1</div>
+        <div>BAR</div>
+        <div class="v accent" id="st-chord">C maj</div>
+        <div>CHORD</div>
+        <div class="status-pulse" id="st-pulse"></div>
+      </div>
+    </div>
+    <div class="status-channels">${bars}</div>
+  </div>`;
+}
+
+function init(rootEl) {
+  rootEl.innerHTML = `<div class="vizu-grid">
+    ${_panel({ num:'01', name:'FFT SPECTRUM',
+      readouts:[{label:'PEAK', value:'-6 dB', id:'rd-peak'},{label:'RMS', value:'-18 dB', id:'rd-rms'}],
+      cornerBL:'20 Hz', cornerBR:'20 kHz',
+      body:'<canvas class="v-canvas" id="cv-fft"></canvas>', klass:'v-fft' })}
+    ${_panel({ num:'02', name:'TERRAIN · 3D',
+      readouts:[{label:'DEPTH', value:'36'},{label:'TILT', value:'22°'}],
+      cornerBL:'FREQ →', cornerBR:'TIME ↙',
+      body:'<canvas class="v-canvas" id="cv-terrain"></canvas>', klass:'v-terrain' })}
+    ${_panel({ num:'03', name:'STATUS',
+      readouts:[{label:'7 CH'}],
+      cornerBL:'NOW', cornerBR:'LIVE',
+      body:_statusHTML(), klass:'v-status' })}
+    ${_panel({ num:'04', name:'SPECTROGRAM',
+      readouts:[{label:'WIN', value:'1024'},{label:'HOP', value:'512'}],
+      cornerBL:'TIME →', cornerBR:'FREQ ↑',
+      body:'<canvas class="v-canvas" id="cv-spectro"></canvas>', klass:'v-spectro' })}
+    ${_panel({ num:'05', name:'OSCILLOSCOPE',
+      readouts:[{label:'10 ms/DIV · 0.5 V/DIV'}],
+      cornerBL:'PHOSPHOR', cornerBR:'TRG ▮▮▮▯▯',
+      body:'<canvas class="v-canvas" id="cv-scope"></canvas>', klass:'v-scope' })}
+    ${_panel({ num:'06', name:'PHASE SCOPE',
+      readouts:[{label:'CORR', value:'+0.00', id:'rd-corr'},{label:'X / Y'}],
+      cornerBL:'L', cornerBR:'R',
+      body:'<canvas class="v-canvas" id="cv-phase"></canvas>', klass:'v-phase' })}
+  </div>`;
+}
 
 // ══════════════════════════════════════════════════════════════════
-// Main loop
+// rAF loop
 // ══════════════════════════════════════════════════════════════════
 let _rafId   = null;
 let _active  = false;
@@ -583,6 +590,8 @@ function _loop() {
 }
 
 const RackVisu = {
+  init,
+
   start() {
     if (_active) return;
     _active = true;

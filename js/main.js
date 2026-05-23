@@ -1,8 +1,8 @@
 import EventBus       from './EventBus.js';
-import Geometry       from './layout/Geometry.js';
 import AudioEngine    from './audio/AudioEngine.js';
 import FXBus          from './audio/FXBus.js';
 import SynthEngine    from './audio/SynthEngine.js';
+import BassEngine     from './audio/BassEngine.js';
 import PatternStore   from './sequencer/PatternStore.js';
 import Transport      from './sequencer/Transport.js';
 import TemporalMemory from './sequencer/TemporalMemory.js';
@@ -10,34 +10,26 @@ import Humanizer      from './sequencer/Humanizer.js';
 import ArpSeq         from './sequencer/ArpSeq.js';
 import SynthPattern   from './sequencer/SynthPattern.js';
 import BassPattern    from './sequencer/BassPattern.js';
-import BassEngine     from './audio/BassEngine.js';
-import StepGrid          from './ui/StepGrid.js';
-import HumanColumn       from './ui/HumanColumn.js';
-import EffectsPanel      from './ui/EffectsPanel.js';
-import MixPanel          from './ui/MixPanel.js';
-import PatternSelector   from './ui/PatternSelector.js';
-import ArpControls       from './ui/ArpControls.js';
-import BassControls      from './ui/BassControls.js';
-import BassPatternBrowser from './ui/BassPatternBrowser.js';
-import EuclideanPanel    from './ui/EuclideanPanel.js';
-import VisuCanvas        from './visu/VisuCanvas.js';
-import ChordWheel        from './ui/ChordWheel.js';
-import RackVisu          from './visu/RackVisu.js';
-import MidiInput         from './midi/MidiInput.js';
+import ComposeView    from './ui/ComposeView.js';
+import RackVisu       from './visu/RackVisu.js';
+import MidiInput      from './midi/MidiInput.js';
 
-const AppState = {
-  state: 'idle',
-  set(s) {
-    this.state = s;
-    document.body.dataset.appState = s;
+const INIT_SEED = 4011;
+
+async function ensureAudio() {
+  if (!AudioEngine.ctx) {
+    await AudioEngine.init();
+    SynthEngine.init(AudioEngine.ctx, AudioEngine.getMasterGain());
+    BassEngine.init(AudioEngine.ctx, AudioEngine.getMasterGain());
+  } else if (AudioEngine.ctx.state === 'suspended') {
+    await AudioEngine.ctx.resume();
   }
-};
+}
 
-async function boot() {
-  Geometry.update();
-
+function boot() {
+  // Audio module wiring (no side effects until ensureAudio())
   TemporalMemory.init();
-  Humanizer.init(HumanColumn.getSeed());
+  Humanizer.init(INIT_SEED);
   FXBus.listen();
   SynthEngine.listen();
   BassEngine.listen();
@@ -45,191 +37,98 @@ async function boot() {
   SynthPattern.listen();
   BassPattern.listen();
 
-  VisuCanvas.init(document.getElementById('visu'));
-  ChordWheel.init(document.getElementById('chord-wheel'));
+  // UI
+  const viewCompose = document.getElementById('view-compose');
+  const viewVizu    = document.getElementById('view-vizu');
+  ComposeView.init(viewCompose, INIT_SEED);
+  RackVisu.init(viewVizu);
+  RackVisu.start();
 
-  // UI panels — each mounted in its panel-body
-  StepGrid.init(document.getElementById('sequencer'));
-  HumanColumn.init(document.getElementById('human-controls'));
-  EffectsPanel.init(document.getElementById('effects-controls'));
-  MixPanel.init(document.getElementById('mix-controls'));
-  PatternSelector.init(document.getElementById('pattern-selector'));
-  ArpControls.init(document.getElementById('arp-controls-mount'));
-  BassPatternBrowser.init(document.getElementById('bass-browser-mount'));
-  BassControls.init(document.getElementById('bass-controls-mount'));
-  EuclideanPanel.init(document.getElementById('euc-panel-mount'));
+  // ── Mode switching ───────────────────────────────────────────────
+  function setMode(mode) {
+    document.body.dataset.mode = mode;
+    const pill = document.getElementById('mode-pill');
+    if (pill) pill.textContent = mode.toUpperCase();
+  }
 
-  // Transport controls
-  const btnPlay  = document.getElementById('btn-play');
-  const btnStop  = document.getElementById('btn-stop');
-  const btnReset = document.getElementById('btn-reset');
+  document.getElementById('mode-pill')?.addEventListener('click', () => {
+    setMode(document.body.dataset.mode === 'vizu' ? 'compose' : 'vizu');
+  });
 
-  btnPlay.addEventListener('click', async () => {
-    if (!AudioEngine.ctx) {
-      await AudioEngine.init();
-      SynthEngine.init(AudioEngine.ctx, AudioEngine.getMasterGain());
-      BassEngine.init(AudioEngine.ctx, AudioEngine.getMasterGain());
-    } else if (AudioEngine.ctx.state === 'suspended') {
-      await AudioEngine.ctx.resume();
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Tab' || e.code === 'KeyV') {
+      e.preventDefault();
+      setMode(document.body.dataset.mode === 'vizu' ? 'compose' : 'vizu');
+    } else if (e.code === 'Space') {
+      e.preventDefault();
+      if (Transport.isPlaying) EventBus.emit('ui:stop');
+      else EventBus.emit('ui:play');
     }
+  });
+
+  // ── Transport ────────────────────────────────────────────────────
+  EventBus.on('ui:play', async () => {
+    await ensureAudio();
     Transport.start();
-    AppState.set('playing');
   });
 
-  btnStop.addEventListener('click', () => {
-    Transport.stop();
-    AppState.set('stopped');
-  });
+  EventBus.on('ui:stop', () => Transport.stop());
 
-  btnReset.addEventListener('click', () => {
+  EventBus.on('ui:reset', () => {
     PatternStore.reset();
     TemporalMemory.reset();
   });
 
-  // Theme toggle (3 states: dark → amber → green → dark)
-  const THEME_CYCLE  = ['dark', 'amber', 'green'];
-  const THEME_LABELS = { dark: 'LGT', amber: 'AMB', green: 'GRN' };
-  const btnTheme = document.getElementById('btn-theme');
-  const applyTheme = t => {
-    document.body.dataset.theme = t;
-    btnTheme.textContent = THEME_LABELS[t] ?? 'LGT';
-    btnTheme.classList.toggle('active', t !== 'dark');
-    localStorage.setItem('krwk-theme', t);
-    EventBus.emit('theme:change', { palette: t === 'dark' ? 'white' : t });
-  };
-  const savedTheme = localStorage.getItem('krwk-theme') ?? 'dark';
-  applyTheme(THEME_CYCLE.includes(savedTheme) ? savedTheme : 'dark');
-  btnTheme.addEventListener('click', () => {
-    const cur  = document.body.dataset.theme;
-    const next = THEME_CYCLE[(THEME_CYCLE.indexOf(cur) + 1) % THEME_CYCLE.length];
-    applyTheme(next);
-  });
-
-  // Mixer routing
+  // ── Mixer routing (drum synth gain per channel) ──────────────────
   EventBus.on('mixer:volume', ({ track, value }) => {
     if (['kick','snare','clap','hihat','hihat_open'].includes(track)) {
       AudioEngine.drumSynth?.setTrackVolume(track, value);
     }
   });
 
-  // Fullscreen
-  const btnFs = document.getElementById('btn-fullscreen');
-  btnFs.addEventListener('click', () => {
-    document.fullscreenElement
-      ? document.exitFullscreen()
-      : document.documentElement.requestFullscreen();
-  });
-  document.addEventListener('fullscreenchange', () => {
-    btnFs.textContent = document.fullscreenElement ? 'EXIT' : 'FULL';
-    btnFs.classList.toggle('active', !!document.fullscreenElement);
-    Geometry.update();
-  });
+  // ── Status strip (top bar) ───────────────────────────────────────
+  let _loopCount = 0;
 
-  // Step length selector
-  document.querySelectorAll('.length-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const steps = parseInt(btn.dataset.steps, 10);
-      PatternStore.setPatternSteps(PatternStore.activePattern, steps);
-      document.querySelectorAll('.length-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      // Update bones-meta
-      const meta = document.getElementById('bones-meta');
-      if (meta) meta.textContent = `${steps} STEPS · 5 TRK · PATTERN ${PatternStore.activePattern.toUpperCase()}`;
-    });
-  });
+  EventBus.on('transport:tick', ({ step, steps }) => {
+    if (step === 0) _loopCount++;
 
-  const syncLengthBtns = () => {
-    const s = PatternStore.getSteps();
-    document.querySelectorAll('.length-btn').forEach(b => {
-      b.classList.toggle('active', parseInt(b.dataset.steps, 10) === s);
-    });
-  };
-  EventBus.on('pattern:changed', syncLengthBtns);
+    const stepsPerBeat = Math.max(1, steps / 4);
+    const beat = Math.floor(step / stepsPerBeat) + 1;
 
-  // Capture
-  document.getElementById('btn-capture').addEventListener('click', () => _capture());
-  document.addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); _capture(); } });
+    const sBpm  = document.getElementById('s-bpm');
+    const sBar  = document.getElementById('s-bar');
+    const sLoop = document.getElementById('s-loop');
+    if (sBpm)  sBpm.textContent  = PatternStore.getBPM();
+    if (sBar)  sBar.textContent  = _loopCount + '.' + beat;
+    if (sLoop) sLoop.textContent = _loopCount;
 
-  function _capture() {
-    AppState.set('capture');
-    const canvas  = document.getElementById('visu');
-    const bpm     = PatternStore.getBPM();
-    const seed    = String(HumanColumn.getSeed()).padStart(4, '0');
-    const chord   = `${VisuCanvas.currentChord.root}${VisuCanvas.currentChord.quality}`.replace('#', 's');
-    const now     = new Date();
-    const ts      = `${String(now.getHours()).padStart(2,'0')}h${String(now.getMinutes()).padStart(2,'0')}m${String(now.getSeconds()).padStart(2,'0')}s`;
-    const filename = `KRWK-VIZ_BPM${bpm}_SEED${seed}_${chord}_${ts}.png`;
-
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'rgba(255,255,255,0.18)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    const link    = document.createElement('a');
-    link.download = filename;
-    link.href     = canvas.toDataURL('image/png');
-    link.click();
-
-    setTimeout(() => AppState.set(Transport.isPlaying ? 'playing' : 'stopped'), 150);
-  }
-
-  // MIDI input
-  const btnMidi = document.getElementById('btn-midi');
-  MidiInput.init().then(ok => {
-    if (!ok) { if (btnMidi) btnMidi.style.display = 'none'; return; }
-    const updateMidiBtn = () => {
-      if (!btnMidi) return;
-      const mode = MidiInput.getMode();
-      btnMidi.textContent = mode === 'chord' ? 'MIDI:CHD' : 'MIDI:NOT';
-      btnMidi.classList.add('active');
-    };
-    updateMidiBtn();
-    if (btnMidi) btnMidi.addEventListener('click', () => {
-      MidiInput.setMode(MidiInput.getMode() === 'chord' ? 'notes' : 'chord');
-      updateMidiBtn();
-    });
-  });
-
-  // Mode switching — COMPOSE ↔ VIZU
-  function setMode(mode) {
-    document.body.dataset.mode = mode;
-    const brandMode = document.getElementById('brand-mode');
-    if (brandMode) brandMode.textContent = mode.toUpperCase();
-    if (mode === 'vizu') RackVisu.start();
-    else RackVisu.stop();
-  }
-
-  document.getElementById('btn-vizu').addEventListener('click',       () => setMode('vizu'));
-  document.getElementById('btn-vizu-inner').addEventListener('click', () => setMode('vizu'));
-  document.getElementById('btn-compose').addEventListener('click',    () => setMode('compose'));
-  document.addEventListener('keydown', e => {
-    if (e.code === 'Tab') {
-      e.preventDefault();
-      setMode(document.body.dataset.mode === 'vizu' ? 'compose' : 'vizu');
+    // Live dot flash on every quarter note
+    if (step % 4 === 0) {
+      const dot = document.getElementById('live-dot');
+      if (dot) {
+        dot.style.opacity = '1';
+        setTimeout(() => { if (dot) dot.style.opacity = ''; }, 80);
+      }
     }
   });
 
-  EventBus.on('seed:change', () => {
-    const canvas = document.getElementById('visu');
-    const ctx    = canvas.getContext('2d');
-    ctx.fillStyle = 'rgba(240,240,240,0.07)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  EventBus.on('transport:stop', () => {
+    _loopCount = 0;
+    const sBar  = document.getElementById('s-bar');
+    const sLoop = document.getElementById('s-loop');
+    if (sBar)  sBar.textContent  = '1.1';
+    if (sLoop) sLoop.textContent = '0';
   });
 
-  // Pattern selector meta update
-  EventBus.on('pattern:changed', () => {
-    const meta = document.getElementById('bones-meta');
-    if (meta) {
-      const s = PatternStore.getSteps();
-      meta.textContent = `${s} STEPS · 5 TRK · PATTERN ${PatternStore.activePattern.toUpperCase()}`;
-    }
-  });
+  // ── MIDI ─────────────────────────────────────────────────────────
+  MidiInput.init().catch(() => {});
 
-  // Live indicator
-  EventBus.on('ui:step', () => {
-    const dot = document.getElementById('live-indicator');
-    if (dot) dot.classList.add('blink');
-    setTimeout(() => dot?.classList.remove('blink'), 80);
-  });
+  // ── ComposeView animation frame ──────────────────────────────────
+  function frame() {
+    ComposeView.frame();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
 }
 
 boot();

@@ -5,228 +5,38 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>KRWK—VIZ</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/15.0.4/Tone.js"></script>
-  <link rel="stylesheet" href="style.css?v=6">
+  <link rel="stylesheet" href="style.css?v=8">
 </head>
-<body>
+<body data-mode="compose">
+  <div class="app">
 
-  <!-- Layer 0 — living canvas background -->
-  <canvas id="visu"></canvas>
-
-  <!-- Layer 1b — chord quality overlay -->
-  <div id="chord-wheel"></div>
-
-  <!-- Layer 1 — UI overlay -->
-  <div id="app">
-
-    <!-- Global header -->
-    <header id="app-header">
-      <div id="brand">KRWK-VIZ · <span id="brand-mode">COMPOSE</span></div>
-      <div id="pattern-dots">
-        <span class="pdot active"></span>
-        <span class="pdot"></span>
-        <span class="pdot"></span>
-        <span class="pdot"></span>
-        <span class="pdot"></span>
-        <span class="pdot"></span>
-        <span class="pdot"></span>
-        <span class="pdot"></span>
-      </div>
-      <div id="header-right">
-        <span id="live-indicator">● LIVE</span>
-      </div>
-    </header>
-
-    <!-- Sub-header rack info -->
-    <div id="subheader">
-      <span id="subheader-left">MK-1 · CONTROL RACK · v0.2</span>
-      <span id="subheader-center">B O N E S · H U M A N · C O L O R</span>
-      <div id="subheader-right">
-        <button id="btn-midi"  class="subhdr-btn">MIDI:—</button>
-        <button id="btn-theme" class="subhdr-btn">LGT</button>
-        <button id="btn-vizu"  class="subhdr-btn subhdr-accent">VIZU →</button>
+    <div class="status-strip">
+      <span class="brand">KRWK—VIZ</span>
+      <span class="center">BONES <span class="sep">·</span> HUMAN <span class="sep">·</span> COLOR</span>
+      <div class="right">
+        <span><span class="live-dot" id="live-dot"></span>LIVE</span>
+        <span>BPM <span class="v" id="s-bpm">128</span></span>
+        <span>BAR <span class="v" id="s-bar">1.1</span></span>
+        <span>LOOP <span class="v" id="s-loop">0</span></span>
+        <span>SEED <span class="v" id="s-seed">4011</span></span>
+        <span class="mode-pill" id="mode-pill">COMPOSE</span>
       </div>
     </div>
 
-    <!-- 9-panel workspace grid -->
-    <div id="workspace">
-
-      <!-- 01 / BONES SEQUENCER -->
-      <div class="panel" id="panel-bones">
-        <div class="panel-header">
-          <span class="panel-num">01</span>
-          <span class="panel-sep">/</span>
-          <span class="panel-title">BONES SEQUENCER</span>
-          <span class="panel-meta" id="bones-meta">16 STEPS · 5 TRK · PATTERN A</span>
-        </div>
-        <div class="panel-body">
-          <!-- StepGrid renders as position:fixed overlay — mounts here symbolically -->
-          <div id="sequencer"></div>
-          <!-- bottom row: pattern + steps selectors sit inside bones panel bottom -->
-          <div id="bones-footer">
-            <div class="bar-group">
-              <span class="bar-label">PATTERN</span>
-              <div id="pattern-selector"></div>
-            </div>
-            <div class="bar-group">
-              <span class="bar-label">STEPS</span>
-              <button class="length-btn" data-steps="8">8</button>
-              <button class="length-btn active" data-steps="16">16</button>
-              <button class="length-btn" data-steps="12">12</button>
-              <button class="length-btn" data-steps="32">32</button>
-            </div>
-            <div class="bar-group">
-              <span class="bar-label" id="bar-info">BAR</span>
-              <span class="bar-val" id="bar-count">1 / 4</span>
-            </div>
-            <div class="bar-group">
-              <span class="bar-label">LOOP</span>
-              <span class="bar-val" id="loop-count">27</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 02 / TEMPO & GROOVE -->
-      <div class="panel" id="panel-tempo">
-        <div class="panel-header">
-          <span class="panel-num">02</span>
-          <span class="panel-sep">/</span>
-          <span class="panel-title">TEMPO &amp; GROOVE</span>
-        </div>
-        <div class="panel-body" id="human-controls"></div>
-      </div>
-
-      <!-- 03 / HARMONY COF -->
-      <div class="panel" id="panel-cof">
-        <div class="panel-header">
-          <span class="panel-num">03</span>
-          <span class="panel-sep">/</span>
-          <span class="panel-title">HARMONY COF</span>
-          <span class="panel-meta">ARP UP·4 · 1/8</span>
-          <span class="panel-meta" style="margin-left:8px;opacity:.5">TIMELINE</span>
-        </div>
-        <div class="panel-body" id="color">
-          <!-- Canvas renders COF here (transparent panel body) -->
-          <div id="timeline-panel">
-            <button class="timeline-btn active">C maj</button>
-            <button class="timeline-btn">G maj</button>
-            <button class="timeline-btn">A min</button>
-            <button class="timeline-btn">F maj</button>
-          </div>
-          <div id="cof-arp-footer">
-            <span class="cof-footer-label">ARP SPEED</span>
-            <span class="cof-footer-label">GATE</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 04 / EFFECTS -->
-      <div class="panel" id="panel-effects">
-        <div class="panel-header">
-          <span class="panel-num">04</span>
-          <span class="panel-sep">/</span>
-          <span class="panel-title">EFFECTS</span>
-        </div>
-        <div class="panel-body" id="effects-controls"></div>
-      </div>
-
-      <!-- 05 / MIX -->
-      <div class="panel" id="panel-mix">
-        <div class="panel-header">
-          <span class="panel-num">05</span>
-          <span class="panel-sep">/</span>
-          <span class="panel-title">MIX</span>
-          <span class="panel-meta" id="master-label">MASTER 85%</span>
-        </div>
-        <div class="panel-body" id="mix-controls"></div>
-      </div>
-
-      <!-- 06 / BASS JOY -->
-      <div class="panel" id="panel-bass">
-        <div class="panel-header">
-          <span class="panel-num">06</span>
-          <span class="panel-sep">/</span>
-          <span class="panel-title">BASS JOY</span>
-          <span class="panel-meta">HSE · MIN · pat 1/30</span>
-        </div>
-        <div class="panel-body" id="bass-panel-body">
-          <div id="bass-browser-mount"></div>
-          <div id="bass-controls-mount"></div>
-        </div>
-      </div>
-
-      <!-- 07 / EUCLID -->
-      <div class="panel" id="panel-euclid">
-        <div class="panel-header">
-          <span class="panel-num">07</span>
-          <span class="panel-sep">/</span>
-          <span class="panel-title">EUCLID</span>
-          <span class="panel-meta">BJORKLUND</span>
-        </div>
-        <div class="panel-body" id="euc-panel-mount"></div>
-      </div>
-
-      <!-- 08 / ARP PRESETS -->
-      <div class="panel" id="panel-arp">
-        <div class="panel-header">
-          <span class="panel-num">08</span>
-          <span class="panel-sep">/</span>
-          <span class="panel-title">ARP PRESETS</span>
-          <span class="panel-meta" id="arp-current-label">UP·4 1/8</span>
-        </div>
-        <div class="panel-body" id="arp-controls-mount"></div>
-      </div>
-
-      <!-- 09 / TRANSPORT -->
-      <div class="panel" id="panel-transport">
-        <div class="panel-header">
-          <span class="panel-num">09</span>
-          <span class="panel-sep">/</span>
-          <span class="panel-title">TRANSPORT</span>
-          <span class="panel-meta transport-status-meta">SR 48000 &nbsp; BUF 256 &nbsp; LAT 5.3ms &nbsp; <span class="rec-dot">●</span> REC 6%</span>
-        </div>
-        <div class="panel-body" id="transport-body">
-          <div id="transport-controls">
-            <button id="btn-play"       class="transport-btn">▶ PLAY</button>
-            <button id="btn-stop"       class="transport-btn">■ STOP</button>
-            <button id="btn-reset"      class="transport-btn">↺ RESET</button>
-            <button id="btn-capture"    class="transport-btn">⊞ CAP</button>
-            <button id="btn-fullscreen" class="transport-btn">FULL</button>
-          </div>
-          <div id="transport-vizu">
-            <button id="btn-vizu-inner" class="transport-btn transport-accent">→ VIZU [TAB]</button>
-          </div>
-        </div>
-      </div>
-
-    </div><!-- /workspace -->
-
-  </div><!-- /app -->
-
-  <!-- Layer 2 — VIZU rack (masqué jusqu'à data-mode="vizu") -->
-  <div id="vizu-rack">
-    <div id="rack-header">
-      <span id="rack-bpm-label">120</span><span class="rack-unit"> BPM</span>
-      <span id="st-pulse" class="rack-pulse">●</span>
-      <span class="rack-sep">BAR </span><span id="rack-bar">1</span>
-      <span class="rack-sep"> LOOP </span><span id="rack-loop">0</span>
-      <span class="rack-readout"><span id="rd-peak">−90</span> dBFS PEAK</span>
-      <span class="rack-readout"><span id="rd-rms">−90</span> dBFS RMS</span>
-      <span class="rack-readout">Φ <span id="rd-corr">+0.00</span></span>
-      <button id="btn-compose" class="subhdr-btn">← COMPOSE</button>
+    <div class="view-stack">
+      <div class="view view-compose" id="view-compose"></div>
+      <div class="view view-vizu" id="view-vizu"></div>
     </div>
-    <div id="rack-grid">
-      <canvas id="cv-fft"></canvas>
-      <canvas id="cv-terrain"></canvas>
-      <canvas id="cv-vu"></canvas>
-      <canvas id="cv-spectro"></canvas>
-      <canvas id="cv-scope"></canvas>
-      <canvas id="cv-phase"></canvas>
+
+    <div class="signature">
+      <span>SIGNAL <span class="v" id="sig-db">−∞ dB</span> · SR <span class="v">48000</span> · BUF <span class="v">256</span> · LAT <span class="v">5.3 ms</span></span>
+      <span class="c"><span class="rec">● RECORDING SESSION 001</span></span>
+      <span class="r"><span class="kbd-hint">TAB</span> SWAP <span class="kbd-hint">SPACE</span> PLAY</span>
     </div>
+
   </div>
-
-  <script type="module" src="js/main.js"></script>
+  <script type="module" src="js/main.js?v=7"></script>
 </body>
 </html>
