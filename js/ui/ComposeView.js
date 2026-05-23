@@ -469,10 +469,10 @@ function bindInteractions(root) {
     // Arp chip
     const ac = e.target.closest('[data-arp]');
     if (ac) { ArpSeq.queuePreset(+ac.dataset.arp); rerenderArp(); return; }
-    // Transport
-    if (e.target.id === 'btn-play')  { EventBus.emit('ui:play');  return; }
-    if (e.target.id === 'btn-stop')  { EventBus.emit('ui:stop');  return; }
-    if (e.target.id === 'btn-reset') { EventBus.emit('ui:reset'); return; }
+    // Transport — closest() handles any sub-element inside the button
+    if (e.target.closest('#btn-play'))  { EventBus.emit('ui:play');  return; }
+    if (e.target.closest('#btn-stop'))  { EventBus.emit('ui:stop');  return; }
+    if (e.target.closest('#btn-reset')) { EventBus.emit('ui:reset'); return; }
   });
 
   // Timeline double-click → clear slot
