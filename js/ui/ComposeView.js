@@ -40,6 +40,9 @@ let _lastTickTime = 0;
 // Per-channel envelope for VU bars
 const _env = { kick:0, snare:0, clap:0, hihat:0, hihat_open:0, bass:0, synth:0 };
 
+// Bass filter state (mirrors initial slider values in buildBass())
+const _bassParams = { bassCut: 60, bassRes: 10, bassEnv: 70, bassDec: 60 };
+
 // ── Panel chrome helper ────────────────────────────────────────────────────────
 function panel({ num, name, readouts = [], cornerBL, cornerBR, body, klass }) {
   const ro = readouts.map(r =>
@@ -516,12 +519,22 @@ function onSliderMove(track, clientX) {
 }
 
 function onSliderValue(key, pct) {
-  if (key === 'human')    { _human = Math.round(pct); EventBus.emit('human:change', { value: pct / 100 }); }
+  if      (key === 'human')    { _human = Math.round(pct); EventBus.emit('human:change', { value: pct / 100 }); }
   else if (key === 'swing')    { _swing = Math.round(pct); EventBus.emit('swing:change', { value: pct / 100 }); }
   else if (key === 'reverb')   { EventBus.emit('fx:reverb',   { mix: pct / 100 }); }
   else if (key === 'delay')    { EventBus.emit('fx:delay',    { mix: pct / 100 }); }
   else if (key === 'sidechain'){ EventBus.emit('fx:sidechain',{ amount: pct / 100 }); }
-  else if (key === 'dist')     { EventBus.emit('bass:dist',   { amount: pct / 100 }); }
+  else if (key === 'dist')     { EventBus.emit('fx:dist',     { amount: pct / 100 }); }  // was 'bass:dist' — BassEngine listens to 'fx:dist'
+  // Bass filter params — BassEngine listens to 'bass:param'
+  else if (key === 'bassCut' || key === 'bassRes' || key === 'bassEnv' || key === 'bassDec') {
+    _bassParams[key] = pct;
+    EventBus.emit('bass:param', {
+      cutoff:    _bassParams.bassCut / 100,
+      resonance: _bassParams.bassRes / 100,
+      envMod:    _bassParams.bassEnv / 100,
+      decay:     _bassParams.bassDec / 100,
+    });
+  }
 }
 
 function onFaderMove(faderEl, clientY) {
