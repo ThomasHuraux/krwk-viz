@@ -69,7 +69,7 @@ function boot() {
   // ── Transport ────────────────────────────────────────────────────
   EventBus.on('ui:play', async () => {
     await ensureAudio();
-    Transport.start();
+    Transport.start(AudioEngine.ctx);
   });
 
   EventBus.on('ui:stop', () => Transport.stop());

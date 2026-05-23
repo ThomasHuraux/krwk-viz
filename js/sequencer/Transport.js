@@ -13,11 +13,16 @@ const Transport = {
   scheduleMs:   25,
   _timer:       null,
 
-  start() {
+  // ctx param allows the caller to pass an AudioContext explicitly,
+  // avoiding Vite HMR module-identity issues where two imports of
+  // AudioEngine.js can end up as separate instances.
+  start(ctx) {
     if (this.isPlaying) return;
+    this._ctx = ctx ?? AudioEngine.ctx;
+    if (!this._ctx) { console.error('[Transport] No AudioContext — call AudioEngine.init() first'); return; }
     this.isPlaying    = true;
     this.currentStep  = 0;
-    this.nextStepTime = AudioEngine.ctx.currentTime + 0.05;
+    this.nextStepTime = this._ctx.currentTime + 0.05;
     this._schedule();
     EventBus.emit('transport:start', {});
   },
@@ -31,7 +36,7 @@ const Transport = {
   },
 
   _schedule() {
-    const ctx          = AudioEngine.ctx;
+    const ctx          = this._ctx ?? AudioEngine.ctx;
     const bpm          = PatternStore.getBPM();
     const stepDuration = 60 / bpm / 4; // 1/16th note
 
